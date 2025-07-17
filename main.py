@@ -2,97 +2,98 @@ import hashlib
 import sys
 import shutil
 import datetime
-
-import requests
-from pathlib import Path
-import json
+import http.server
+import socketserver
+import threading
 import os
 import subprocess
+import json
+import argparse
+from pathlib import Path
+import requests
 
 EMPTY_CONFIG = {
-    "instances_folder": str(Path.home().joinpath(".minecraft/server_instances").absolute())
+    "instances_folder": str(Path.home().joinpath(".minecraft/server_instances").absolute()),
+    "rp_ip": "0.0.0.0",
 }
 EMPTY_INSTANCE_CFG = {
     "version": "",
     "name": "",
     "memory": "2048M",
-    "auto_backup": False
+    "auto_backup": False,
+    "resourcepack": "",
+    "resourcepack_port": 2548
 }
 
+rp_httpd = None
+rp_server_thread = None
 
 def write_config(cfg):
-    with open('config.json', 'w') as f:
+    config_path = Path.home().joinpath(".minecraft/server_instances/config.json").absolute()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(str(config_path), 'w') as f:
         json.dump(cfg, f, indent=4)
 
-
-def read_confid():
-    if os.path.exists("config.json"):
-        with open("config.json", "r") as cfg:
+def read_config():
+    config_path = Path.home().joinpath(".minecraft/server_instances/config.json").absolute()
+    if config_path.exists():
+        with open(str(config_path), "r") as cfg:
             return json.load(cfg)
     else:
         write_config(EMPTY_CONFIG)
         return EMPTY_CONFIG
 
-
 def get_versions():
     response = requests.get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return {"error": response.status_code, "description": response.text}
-
+    response.raise_for_status()
+    return response.json()
 
 def get_version(ver_id):
-    versions = get_versions().get('versions')
-    version = None
+    versions_manifest = get_versions()
+    versions = versions_manifest.get('versions')
+
     if ver_id == "latest" or ver_id == "l":
-        ver_id = get_versions().get('latest').get("release")
+        ver_id = versions_manifest.get('latest').get("release")
     elif ver_id == "snapshot" or ver_id == "s":
-        ver_id = get_versions().get('latest').get("snapshot")
+        ver_id = versions_manifest.get('latest').get("snapshot")
 
-    for entry in versions:
-        if entry.get('id') == ver_id:
-            print(entry.get('id'))
-            version = entry
-            break
-    if version is None:
-        return {"error": "404", "description": "Version not found"}
+    version_entry = next((entry for entry in versions if entry.get('id') == ver_id), None)
 
-    response = requests.get(version.get('url'))
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return {"error": response.status_code, "description": response.text}
+    if version_entry is None:
+        raise ValueError(f"Version '{ver_id}' not found.")
 
+    response = requests.get(version_entry.get('url'))
+    response.raise_for_status()
+    return response.json()
 
 def download_server(url, sha, destination):
     sha1 = hashlib.sha1()
-    with requests.get(url, stream=True) as response:
-        response.raise_for_status()
-        with open(destination, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-                    sha1.update(chunk)
-    downloaded_sha = sha1.hexdigest()
-    if downloaded_sha != sha:
-        return {"error": "SHA mismatch", "expected": sha, "actual": downloaded_sha}
-    print("Download complete and SHA verified.")
-    return {"success": True, "sha": downloaded_sha}
-
+    try:
+        with requests.get(url, stream=True) as response:
+            response.raise_for_status()
+            with open(destination, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        sha1.update(chunk)
+        downloaded_sha = sha1.hexdigest()
+        if downloaded_sha != sha:
+            raise ValueError(f"SHA1 mismatch for {destination.name}: Expected {sha}, got {downloaded_sha}")
+        print(f"Download complete and SHA1 verified for {destination.name}.")
+        return True
+    except requests.exceptions.RequestException as e:
+        raise IOError(f"Download failed for {url}: {e}")
+    except Exception as e:
+        raise IOError(f"Error writing file {destination}: {e}")
 
 def check_instance(name):
-    config = read_confid()
+    config = read_config()
     instances_path = Path(config['instances_folder'])
-    instances_path.mkdir(parents=True, exist_ok=True)
-    folders = [f.name for f in instances_path.iterdir() if f.is_dir() and f.joinpath("cfg.json").exists()]
-    if name in folders:
-        return True
-    return False
+    instance_path = instances_path.joinpath(name)
+    return instance_path.is_dir() and instance_path.joinpath("cfg.json").exists()
 
-
-def create_instance(name, version, memory, auto_backup=False):
-    config = read_confid()
+def create_instance(name, version, memory, auto_backup=False, resourcepack="", resourcepack_port=2548):
+    config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(name)
     instance_path.mkdir(parents=True, exist_ok=True)
 
@@ -102,63 +103,88 @@ def create_instance(name, version, memory, auto_backup=False):
     elif version == "snapshot" or version == "s":
         resolved_version = get_versions().get('latest').get("snapshot")
 
-    with open(instance_path.joinpath("cfg.json"), "w") as cfg:
-        conf = {
-            "version": resolved_version,
-            "name": name,
-            "memory": memory,
-            "auto_backup": auto_backup
-        }
-        json.dump(conf, cfg, indent=4)
-    with open(instance_path.joinpath("eula.txt"), "w") as f:
-        f.write("eula=true")
+    instance_cfg_data = {
+        "version": resolved_version,
+        "name": name,
+        "memory": memory,
+        "auto_backup": auto_backup,
+        "resourcepack": resourcepack,
+        "resourcepack_port": resourcepack_port
+    }
+    with open(instance_path.joinpath("cfg.json"), "w") as cfg_file:
+        json.dump(instance_cfg_data, cfg_file, indent=4)
+
+    eula_path = instance_path.joinpath("eula.txt")
+    if not eula_path.exists():
+        with open(eula_path, "w") as f:
+            f.write("eula=true\n")
+    else:
+        with open(eula_path, "r+") as f:
+            lines = f.readlines()
+            f.seek(0)
+            updated = False
+            for line in lines:
+                if line.strip() == "eula=false":
+                    f.write("eula=true\n")
+                    updated = True
+                else:
+                    f.write(line)
+            if not updated and "eula=true" not in [l.strip() for l in lines]:
+                f.write("eula=true\n")
+            f.truncate()
 
 
-def edit_instance(name, version=None, memory=None, auto_backup=None):
-    config = read_confid()
+def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepack=None, resourcepack_port=None):
+    config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(name)
-    with open(instance_path.joinpath("cfg.json"), "r") as f:
+    instance_cfg_path = instance_path.joinpath("cfg.json")
+
+    if not instance_cfg_path.exists():
+        raise FileNotFoundError(f"Instance configuration file not found: {instance_cfg_path}")
+
+    with open(instance_cfg_path, "r") as f:
         conf = json.load(f)
 
     if version:
-        resolved_version = version
         if version == "latest" or version == "l":
             resolved_version = get_versions().get('latest').get("release")
         elif version == "snapshot" or version == "s":
             resolved_version = get_versions().get('latest').get("snapshot")
+        else:
+            resolved_version = version
         conf['version'] = resolved_version
     if memory:
         conf['memory'] = memory
     if auto_backup is not None:
         conf['auto_backup'] = auto_backup
+    if resourcepack is not None:
+        conf['resourcepack'] = str(Path(resourcepack).absolute()) if resourcepack else ""
+    if resourcepack_port is not None:
+        conf['resourcepack_port'] = resourcepack_port
 
-    with open(instance_path.joinpath("cfg.json"), "w") as cfg:
-        json.dump(conf, cfg, indent=4)
-
+    with open(instance_cfg_path, "w") as cfg_file:
+        json.dump(conf, cfg_file, indent=4)
 
 def get_instance(name):
-    cfg = read_confid()
+    cfg = read_config()
     instances_path = Path(cfg['instances_folder'])
-    instance = instances_path / name
-    config_path = instance / "cfg.json"
-    if config_path.exists():
-        with open(config_path, "r") as f:
+    instance_config_path = instances_path / name / "cfg.json"
+    if instance_config_path.exists():
+        with open(instance_config_path, "r") as f:
             instance_cfg = json.load(f)
-            if 'memory' not in instance_cfg:
-                instance_cfg['memory'] = EMPTY_INSTANCE_CFG['memory']
-            if 'auto_backup' not in instance_cfg:
-                instance_cfg['auto_backup'] = EMPTY_INSTANCE_CFG['auto_backup']
+            for key, default_value in EMPTY_INSTANCE_CFG.items():
+                if key not in instance_cfg:
+                    instance_cfg[key] = default_value
             return instance_cfg
     return None
 
-
 def backup_instance(instance_name):
-    config = read_confid()
+    config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(instance_name)
 
     if not instance_path.is_dir():
         print(f"Error: Instance folder '{instance_name}' not found at '{instance_path}'.")
-        return
+        return False
 
     backups_path = instance_path / "backups"
     backups_path.mkdir(exist_ok=True)
@@ -168,11 +194,10 @@ def backup_instance(instance_name):
 
     source_path = world_folder
     if not world_folder.is_dir():
-        print(
-            f"Warning: 'world' folder not found for instance '{instance_name}'. Backing up the entire instance directory.")
+        print(f"Warning: 'world' folder not found for instance '{instance_name}'. Backing up the entire instance directory.")
         source_path = instance_path
 
-    backup_name = f"{instance_name}-world-backup-{timestamp}" if world_folder.is_dir() else f"{instance_name}-instance-backup-{timestamp}"
+    backup_name = f"{timestamp}-world-backup" if world_folder.is_dir() else f"{timestamp}-instance-backup"
     destination_path = backups_path / backup_name
 
     try:
@@ -184,7 +209,7 @@ def backup_instance(instance_name):
         return False
 
 def delete_instance(name):
-    config = read_confid()
+    config = read_config()
     instances_path = Path(config['instances_folder'])
     instance_path = instances_path / name
 
@@ -200,86 +225,315 @@ def delete_instance(name):
         print(f"Error deleting instance '{name}': {e}")
         return False
 
+def open_instance_folder(instance_name):
+    config = read_config()
+    instance_path = Path(config['instances_folder']).joinpath(instance_name)
+
+    if not instance_path.exists():
+        print(f"Error: Instance folder '{instance_path}' does not exist.")
+        print("Make sure the instance has been created.")
+        return False
+
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(instance_path))
+        elif sys.platform == "darwin":
+            subprocess.run(['open', str(instance_path)], check=True)
+        else: # Linux/Unix
+            subprocess.run(['xdg-open', str(instance_path)], check=True)
+        print(f"Opened folder: {instance_path}")
+        return True
+    except FileNotFoundError:
+        print(f"Error: Could not find a suitable application to open folder '{instance_path}'.")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"Error opening folder: Command failed with exit code {e.returncode}. {e}")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred while trying to open folder: {e}")
+        return False
+
+def calculate_file_sha1(file_path):
+    sha1 = hashlib.sha1()
+    try:
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                sha1.update(chunk)
+        return sha1.hexdigest()
+    except FileNotFoundError:
+        print(f"Error: File not found at '{file_path}' for SHA1 calculation.")
+        return None
+    except Exception as e:
+        print(f"Error calculating SHA1 for '{file_path}': {e}")
+        return None
+
+def update_server_properties(instance_path, key, value):
+    server_properties_path = instance_path.joinpath("server.properties")
+    properties_lines = []
+    updated = False
+
+    if server_properties_path.exists():
+        with open(server_properties_path, "r") as f:
+            for line in f:
+                stripped_line = line.strip()
+                if stripped_line and '=' in stripped_line and not stripped_line.startswith('#'):
+                    k, v = stripped_line.split('=', 1)
+                    if k.strip() == key:
+                        properties_lines.append(f"{key}={value}\n")
+                        updated = True
+                    else:
+                        properties_lines.append(line)
+                else:
+                    properties_lines.append(line)
+    else:
+        print(f"Warning: server.properties not found for '{instance_path}'. Creating a new one.")
+
+    if not updated:
+        properties_lines.append(f"{key}={value}\n")
+
+    with open(server_properties_path, "w") as f:
+        f.writelines(properties_lines)
+    print(f"Updated server.properties: {key}={value}")
+
+class ResourcePackHTTPHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+def _run_http_server(directory, ip, port):
+    global rp_httpd
+    current_working_directory = os.getcwd()
+    try:
+        os.chdir(directory)
+        handler = ResourcePackHTTPHandler
+        rp_httpd = socketserver.TCPServer((ip, port), handler)
+        print(f"Resource pack HTTP server serving files from '{directory}' at http://{ip}:{port}")
+        rp_httpd.serve_forever()
+    except OSError as e:
+        print(f"Error starting HTTP server on {ip}:{port}: {e}. This port might already be in use or unavailable.")
+    except Exception as e:
+        print(f"An unexpected error occurred in resource pack HTTP server: {e}")
+    finally:
+        os.chdir(current_working_directory)
+
+def start_resourcepack_http_server(file_path, ip, port):
+    global rp_server_thread
+    rp_path = Path(file_path)
+    if not rp_path.is_file():
+        print(f"Error: Resource pack file not found at '{file_path}'. Cannot start HTTP server.")
+        return False
+
+    server_directory = rp_path.parent
+    rp_server_thread = threading.Thread(target=_run_http_server, args=(str(server_directory.absolute()), ip, port), daemon=True)
+    rp_server_thread.start()
+    return True
+
+def stop_resourcepack_http_server():
+    global rp_httpd, rp_server_thread
+    if rp_httpd:
+        print("Stopping resource pack HTTP server...")
+        rp_httpd.shutdown()
+        rp_httpd.server_close()
+        rp_httpd = None
+    if rp_server_thread and rp_server_thread.is_alive():
+        rp_server_thread.join(timeout=1)
+        if rp_server_thread.is_alive():
+            print("Warning: Resource pack HTTP server thread did not terminate gracefully.")
+        rp_server_thread = None
+
+def attach_resourcepack(instance_name, resourcepack_file_path, resourcepack_port=None):
+    config = read_config()
+    instance_path = Path(config['instances_folder']).joinpath(instance_name)
+    instance_cfg = get_instance(instance_name)
+
+    if not instance_cfg:
+        print(f"Error: Instance '{instance_name}' does not exist. Please create it first.")
+        return False
+
+    rp_path = Path(resourcepack_file_path)
+    if not rp_path.is_file():
+        print(f"Error: Resource pack file '{resourcepack_file_path}' not found.")
+        return False
+
+    edit_instance(instance_name, resourcepack=str(rp_path.absolute()),
+                  resourcepack_port=resourcepack_port if resourcepack_port is not None else instance_cfg['resourcepack_port'])
+    instance_cfg = get_instance(instance_name)
+
+    rp_sha1 = calculate_file_sha1(rp_path)
+    if not rp_sha1:
+        print("Failed to calculate resource pack SHA1. Aborting attachment.")
+        return False
+
+    rp_ip = config.get("rp_ip")
+    if not rp_ip:
+        print("Error: Resource pack IP address (rp_ip) not set in main config. Please set it using 'edit-config' command or manually edit config.json.")
+        return False
+
+    rp_url = f"http://{rp_ip}:{instance_cfg['resourcepack_port']}/{rp_path.name}"
+    print(f"Constructed resource pack URL for server.properties: {rp_url}")
+
+    update_server_properties(instance_path, "resource-pack", rp_url)
+    update_server_properties(instance_path, "resource-pack-sha1", rp_sha1)
+
+    print(f"Resource pack '{rp_path.name}' attached to instance '{instance_name}'.")
+    print(f"Minecraft clients will attempt to download it from: {rp_url}")
+    return True
+
 def launch_server(instance_name):
-    config = read_confid()
+    config = read_config()
     instance = get_instance(instance_name)
     if not instance:
         print(f"Instance '{instance_name}' not found.")
         return
 
-    if instance.get('auto_backup', False):
-        print(f"Auto-backup enabled. Creating backup for '{instance_name}' before launch...")
-        if not backup_instance(instance_name):
-            print("Auto-backup failed. Continuing with server launch anyway.")
-        else:
-            print("Auto-backup completed.")
-
-    ver = get_version(instance.get('version'))
-    if "error" in ver:
-        print(f"Version error: {ver['description']}")
-        return
-
     instance_path = Path(config['instances_folder']) / instance_name
-    server_jar_url = ver.get('downloads', {}).get('server', {}).get('url')
-    server_sha = ver.get('downloads', {}).get('server', {}).get('sha1')
-
-    if not server_jar_url or not server_sha:
-        print("Server download info missing.")
-        return
-
     server_jar_path = instance_path / f"server.jar"
 
-    current_sha1 = None
-    if server_jar_path.exists():
-        print("Checking existing server.jar SHA1...")
-        hasher = hashlib.sha1()
-        with open(server_jar_path, 'rb') as f:
-            while chunk := f.read(4096):
-                hasher.update(chunk)
-        current_sha1 = hasher.hexdigest()
-
-    if not server_jar_path.exists() or current_sha1 != server_sha:
-        print(f"server.jar not found or SHA1 mismatch. Downloading {instance.get('version')} server.jar...")
-        result = download_server(server_jar_url, server_sha, server_jar_path)
-        if "error" in result:
-            print(f"Download error: {result}")
-            return
-    else:
-        print("server.jar is up to date.")
-
-    java_exec = "java"
-    if os.name == "nt":
-        java_exec = "java.exe"
-
-    memory_allocation = instance.get('memory', EMPTY_INSTANCE_CFG['memory'])
-
     try:
-        command = [java_exec, f"-Xmx{memory_allocation}", f"-Xms{memory_allocation}", "-jar", str(server_jar_path),
-                   "nogui"]
+        if instance.get('auto_backup', False):
+            print(f"Auto-backup enabled. Creating backup for '{instance_name}' before launch...")
+            if not backup_instance(instance_name):
+                print("Auto-backup failed. Continuing with server launch anyway.")
+            else:
+                print("Auto-backup completed.")
+
+        ver = get_version(instance.get('version'))
+        server_jar_url = ver.get('downloads', {}).get('server', {}).get('url')
+        server_sha = ver.get('downloads', {}).get('server', {}).get('sha1')
+
+        if not server_jar_url or not server_sha:
+            print("Server download information missing from version manifest.")
+            return
+
+        current_sha1 = None
+        if server_jar_path.exists():
+            print("Checking existing server.jar SHA1...")
+            current_sha1 = calculate_file_sha1(server_jar_path)
+
+        if not server_jar_path.exists() or current_sha1 != server_sha:
+            print(f"server.jar not found or SHA1 mismatch. Downloading {instance.get('version')} server.jar...")
+            download_server(server_jar_url, server_sha, server_jar_path)
+        else:
+            print("server.jar is up to date.")
+
+        resourcepack_file = instance.get('resourcepack')
+        resourcepack_port = instance.get('resourcepack_port')
+        if resourcepack_file and Path(resourcepack_file).is_file():
+            print(f"Resource pack '{Path(resourcepack_file).name}' detected. Starting HTTP server...")
+            rp_ip = config.get("rp_ip", EMPTY_CONFIG["rp_ip"])
+            if start_resourcepack_http_server(resourcepack_file, rp_ip, resourcepack_port):
+                print(f"Resource pack HTTP server started on {rp_ip}:{resourcepack_port} serving from '{Path(resourcepack_file).parent}'.")
+            else:
+                print("Failed to start resource pack HTTP server. Server might not function correctly regarding resource packs.")
+
+        java_exec = "java"
+        if sys.platform == "win32":
+            java_exec = "java.exe"
+
+        memory_allocation = instance.get('memory', EMPTY_INSTANCE_CFG['memory'])
+
+        command = [java_exec, f"-Xmx{memory_allocation}", f"-Xms{memory_allocation}", "-jar", str(server_jar_path), "nogui"]
         print(f"Launching server with command: {' '.join(command)}")
-        subprocess.run(command, cwd=instance_path)
+        server_process = subprocess.run(command, cwd=instance_path)
+
+        stop_resourcepack_http_server()
+        print(f"Server '{instance_name}' exited with code {server_process.returncode}.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Network error during server launch (e.g., getting version info, downloading JAR): {e}")
+    except ValueError as e:
+        print(f"Configuration or version error: {e}")
+    except IOError as e:
+        print(f"File system error during server launch: {e}")
+    except FileNotFoundError:
+        print(f"Error: Java executable '{java_exec}' not found. Please ensure Java is installed and in your PATH.")
     except Exception as e:
-        print(f"Failed to launch server: {e}")
+        print(f"An unexpected error occurred during server launch: {e}")
+    finally:
+        stop_resourcepack_http_server()
 
 
-import argparse
+def list_instances():
+    config = read_config()
+    instances_path = Path(config['instances_folder'])
+    instances_path.mkdir(parents=True, exist_ok=True)
+
+    found_instances = []
+    for instance_dir in instances_path.iterdir():
+        if instance_dir.is_dir():
+            cfg_file = instance_dir / "cfg.json"
+            if cfg_file.exists():
+                try:
+                    with open(cfg_file, 'r') as f:
+                        instance_cfg = json.load(f)
+                        name = instance_cfg.get('name', instance_dir.name)
+                        version = instance_cfg.get('version', 'N/A')
+                        memory = instance_cfg.get('memory', EMPTY_INSTANCE_CFG['memory'])
+                        found_instances.append({"name": name, "version": version, "memory": memory})
+                except json.JSONDecodeError:
+                    print(f"Warning: Could not read cfg.json for instance '{instance_dir.name}'. Skipping.")
+                except Exception as e:
+                    print(f"Warning: An error occurred while processing instance '{instance_dir.name}': {e}. Skipping.")
+
+    if found_instances:
+        print("\n--- Available Minecraft Server Instances ---")
+        print(f"{'Name':<20} {'Version':<15} {'Memory':<10}")
+        print(f"{'-'*20:<20} {'-'*15:<15} {'-'*10:<10}")
+        for instance in found_instances:
+            print(f"{instance['name']:<20} {instance['version']:<15} {instance['memory']:<10}")
+        print("------------------------------------------")
+    else:
+        print("No Minecraft server instances found.")
+    return found_instances
+
+def edit_global_config(rp_ip=None, instances_folder=None):
+    current_config = read_config()
+    updated = False
+
+    if rp_ip is not None:
+        current_config["rp_ip"] = rp_ip
+        updated = True
+    if instances_folder is not None:
+        current_config["instances_folder"] = str(Path(instances_folder).absolute())
+        updated = True
+
+    if updated:
+        write_config(current_config)
+        print("Global configuration updated successfully.")
+    else:
+        print("No global configuration settings provided to update.")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Minecraft Server Launcher by MagnarIUK")
-    parser.add_argument("-i", "--instance", required=True, help="Name of The Instance")
-    parser.add_argument("-v", "--version", required=False, help="Instance Version")
-    parser.add_argument("-m", "--memory", required=False,
+    parser.add_argument("-i", "--instance", help="Name of The Instance")
+    parser.add_argument("-v", "--version", help="Instance Version")
+    parser.add_argument("-m", "--memory",
                         help="Memory allocation for the server (e.g., 1024M, 2G). Default is 2048M.")
     parser.add_argument("-ab","--auto-backup", action="store_true",
                         help="Enable automatic world backup before launching the server.")
     parser.add_argument("-nab","--no-auto-backup", action="store_false", dest="auto_backup",
                         help="Disable automatic world backup before launching the server.")
     parser.set_defaults(auto_backup=None)
-    parser.add_argument("-c", "--command", required=True, choices=["create", "launch", "check", "edit", "backup", "delete"],
-                        help="Command to execute")
+    parser.add_argument("-rp", "--resourcepack-file",
+                        help="Path to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
+    parser.add_argument("-rpp", "--resourcepack-port", type=int,
+                        help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.")
+    parser.add_argument("-g_rp_ip", "--global-resourcepack-ip",
+                        help="Global IP address for resource pack server (for 'edit-config' command).")
+    parser.add_argument("-g_if", "--global-instances-folder",
+                        help="Global path for server instances folder (for 'edit-config' command).")
+
+    parser.add_argument("-c", "--command", required=True,
+                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config"],
+                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config'.")
+
 
     args = parser.parse_args()
+
+    instance_commands = ["create", "launch", "check", "edit", "backup", "delete", "open", "attach"]
+    if args.command in instance_commands and not args.instance:
+        parser.error(f"The '{args.command}' command requires the --instance (-i) argument.")
+
 
     if args.command == "check":
         exists = check_instance(args.instance)
@@ -287,43 +541,93 @@ def main():
             print(f"Instance '{args.instance}' exists.")
         else:
             print(f"Instance '{args.instance}' does not exist.")
+
     elif args.command == "create":
-        ab = args.auto_backup if args.auto_backup is not None else False
+        if check_instance(args.instance):
+            print(f"Error: Instance '{args.instance}' already exists.")
+            return
+
         if not args.version:
             print("Error: Version is required to create an instance.")
             return
-        if check_instance(args.instance):
-            print(f"Instance '{args.instance}' already exists.")
-            return
+
         memory_to_use = args.memory if args.memory else EMPTY_INSTANCE_CFG['memory']
-        create_instance(args.instance, args.version, memory_to_use, ab)
-        text = f"Instance '{args.instance}' created with version '{args.version}' and memory '{memory_to_use}'." if not ab else f"Instance '{args.instance}' created with version '{args.version}', memory '{memory_to_use}' and Auto Backup enabled."
-        print(text)
+        auto_backup_setting = args.auto_backup if args.auto_backup is not None else False
+        resourcepack_path = args.resourcepack_file if args.resourcepack_file else ""
+        resourcepack_port_setting = args.resourcepack_port if args.resourcepack_port is not None else EMPTY_INSTANCE_CFG['resourcepack_port']
+
+        try:
+            create_instance(args.instance, args.version, memory_to_use, auto_backup_setting,
+                            resourcepack=resourcepack_path,
+                            resourcepack_port=resourcepack_port_setting)
+            print(f"Instance '{args.instance}' created successfully.")
+            print(f"  Version: {args.version}")
+            print(f"  Memory: {memory_to_use}")
+            print(f"  Auto-backup: {'Enabled' if auto_backup_setting else 'Disabled'}")
+            if resourcepack_path:
+                print(f"  Resource pack: '{Path(resourcepack_path).name}' on port {resourcepack_port_setting}")
+        except Exception as e:
+            print(f"Failed to create instance '{args.instance}': {e}")
+
+
     elif args.command == "edit":
         if not check_instance(args.instance):
-            print(f"Instance '{args.instance}' does not exist.")
+            print(f"Error: Instance '{args.instance}' does not exist.")
             return
-        if not args.version and not args.memory and args.auto_backup is None:
-            print("Error: Either version, memory, or auto-backup setting must be provided to edit an instance.")
+        if not any([args.version, args.memory, args.auto_backup is not None, args.resourcepack_file is not None, args.resourcepack_port is not None]):
+            print("Error: At least one of version, memory, auto-backup, resource pack file, or resource pack port must be provided to edit an instance.")
             return
-        edit_instance(args.instance, args.version, args.memory, args.auto_backup)
-        print(f"Instance '{args.instance}' updated.")
+        try:
+            edit_instance(args.instance, args.version, args.memory, args.auto_backup,
+                          resourcepack=args.resourcepack_file, resourcepack_port=args.resourcepack_port)
+            print(f"Instance '{args.instance}' updated successfully.")
+        except Exception as e:
+            print(f"Failed to edit instance '{args.instance}': {e}")
+
+
     elif args.command == "launch":
         if not check_instance(args.instance):
-            print(f"Instance '{args.instance}' does not exist.")
+            print(f"Error: Instance '{args.instance}' does not exist.")
             return
         launch_server(args.instance)
+
     elif args.command == "backup":
         if not check_instance(args.instance):
-            print(f"Instance '{args.instance}' does not exist.")
+            print(f"Error: Instance '{args.instance}' does not exist.")
             return
         backup_instance(args.instance)
+
     elif args.command == "delete":
         if not check_instance(args.instance):
-            print(f"Instance '{args.instance}' does not exist.")
+            print(f"Error: Instance '{args.instance}' does not exist.")
             return
-        delete_instance(args.instance)
+        confirm = input(f"Are you sure you want to delete instance '{args.instance}' and all its data? (yes/no): ").lower()
+        if confirm == 'yes':
+            delete_instance(args.instance)
+        else:
+            print("Deletion cancelled.")
 
+    elif args.command == "open":
+        if not check_instance(args.instance):
+            print(f"Error: Instance '{args.instance}' does not exist.")
+            return
+        open_instance_folder(args.instance)
+
+    elif args.command == "attach":
+        if not check_instance(args.instance):
+            print(f"Error: Instance '{args.instance}' does not exist. Cannot attach resource pack.")
+            return
+        if not args.resourcepack_file:
+            print("Error: A resource pack file path (--resourcepack-file or -rp) is required for the 'attach' command.")
+            return
+        attach_resourcepack(args.instance, args.resourcepack_file, args.resourcepack_port)
+    elif args.command == "list":
+        list_instances()
+    elif args.command == "edit-config":
+        if not any([args.global_resourcepack_ip is not None, args.global_instances_folder is not None]):
+            print("Error: At least one of --global-resourcepack-ip or --global-instances-folder must be provided to edit global config.")
+            return
+        edit_global_config(rp_ip=args.global_resourcepack_ip, instances_folder=args.global_instances_folder)
 
 
 if __name__ == "__main__":
@@ -331,4 +635,9 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\nExecution interrupted by user. Exiting...")
+        stop_resourcepack_http_server()
         sys.exit(0)
+    except Exception as e:
+        print(f"An unhandled error occurred: {e}")
+        stop_resourcepack_http_server()
+        sys.exit(1)
