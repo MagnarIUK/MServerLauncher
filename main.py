@@ -16,6 +16,7 @@ EMPTY_CONFIG = {
     "instances_folder": str(Path.home().joinpath(".minecraft/server_instances").absolute()),
     "rp_ip": "0.0.0.0",
 }
+
 EMPTY_INSTANCE_CFG = {
     "version": "",
     "name": "",
