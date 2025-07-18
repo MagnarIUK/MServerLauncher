@@ -268,33 +268,42 @@ def calculate_file_sha1(file_path):
         print(f"Error calculating SHA1 for '{file_path}': {e}")
         return None
 
-def update_server_properties(instance_path, key, value):
-    server_properties_path = instance_path.joinpath("server.properties")
-    properties_lines = []
-    updated = False
+def update_server_properties(instance_name, key, value):
+    config = read_config()
 
-    if server_properties_path.exists():
-        with open(server_properties_path, "r") as f:
-            for line in f:
-                stripped_line = line.strip()
-                if stripped_line and '=' in stripped_line and not stripped_line.startswith('#'):
-                    k, v = stripped_line.split('=', 1)
-                    if k.strip() == key:
-                        properties_lines.append(f"{key}={value}\n")
-                        updated = True
-                    else:
-                        properties_lines.append(line)
-                else:
-                    properties_lines.append(line)
-    else:
-        print(f"Warning: server.properties not found for '{instance_path}'. Creating a new one.")
+    server_properties_path = Path(config['instances_folder']).joinpath(f"{instance_name}/server.properties")
+    properties = {}
+    lines = []
 
-    if not updated:
-        properties_lines.append(f"{key}={value}\n")
+    if not server_properties_path.exists():
+        print(f"Error: server.properties not found at '{server_properties_path}'.")
+        return False
+
+    with open(server_properties_path, "r") as f:
+        for line in f:
+            stripped = line.strip()
+            if stripped and '=' in stripped and not stripped.startswith('#'):
+                k, v = stripped.split('=', 1)
+                properties[k.strip()] = v.strip()
+            lines.append(line)
+
+    if key not in properties:
+        print(f"Key '{key}' not found in server.properties. No changes made.")
+        return False
+
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(f"{key}=") and not stripped.startswith('#'):
+            new_lines.append(f"{key}={value}\n")
+        else:
+            new_lines.append(line)
 
     with open(server_properties_path, "w") as f:
-        f.writelines(properties_lines)
+        f.writelines(new_lines)
+
     print(f"Updated server.properties: {key}={value}")
+    return True
 
 class ResourcePackHTTPHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -341,24 +350,13 @@ def stop_resourcepack_http_server():
             print("Warning: Resource pack HTTP server thread did not terminate gracefully.")
         rp_server_thread = None
 
-def attach_resourcepack(instance_name, resourcepack_file_path, resourcepack_port=None):
+def set_resourcepack(instance_name):
     config = read_config()
-    instance_path = Path(config['instances_folder']).joinpath(instance_name)
     instance_cfg = get_instance(instance_name)
-
-    if not instance_cfg:
-        print(f"Error: Instance '{instance_name}' does not exist. Please create it first.")
-        return False
-
-    rp_path = Path(resourcepack_file_path)
+    rp_path = Path(instance_cfg['resourcepack'])
     if not rp_path.is_file():
-        print(f"Error: Resource pack file '{resourcepack_file_path}' not found.")
+        print(f"Error: Resource pack file '{rp_path.absolute()}' not found.")
         return False
-
-    edit_instance(instance_name, resourcepack=str(rp_path.absolute()),
-                  resourcepack_port=resourcepack_port if resourcepack_port is not None else instance_cfg['resourcepack_port'])
-    instance_cfg = get_instance(instance_name)
-
     rp_sha1 = calculate_file_sha1(rp_path)
     if not rp_sha1:
         print("Failed to calculate resource pack SHA1. Aborting attachment.")
@@ -372,12 +370,33 @@ def attach_resourcepack(instance_name, resourcepack_file_path, resourcepack_port
     rp_url = f"http://{rp_ip}:{instance_cfg['resourcepack_port']}/{rp_path.name}"
     print(f"Constructed resource pack URL for server.properties: {rp_url}")
 
-    update_server_properties(instance_path, "resource-pack", rp_url)
-    update_server_properties(instance_path, "resource-pack-sha1", rp_sha1)
+    update_server_properties(instance_name, "require-resource-pack", "true")
+    update_server_properties(instance_name, "resource-pack", rp_url)
+    update_server_properties(instance_name, "resource-pack-sha1", rp_sha1)
 
     print(f"Resource pack '{rp_path.name}' attached to instance '{instance_name}'.")
     print(f"Minecraft clients will attempt to download it from: {rp_url}")
     return True
+
+
+def attach_resourcepack(instance_name, resourcepack_file_path, resourcepack_port=None):
+    config = read_config()
+    instance_cfg = get_instance(instance_name)
+
+    if not instance_cfg:
+        print(f"Error: Instance '{instance_name}' does not exist. Please create it first.")
+        return False
+
+    rp_path = Path(resourcepack_file_path)
+    if not rp_path.is_file():
+        print(f"Error: Resource pack file '{resourcepack_file_path}' not found.")
+        return False
+
+    edit_instance(instance_name, resourcepack=str(rp_path.absolute()),
+                  resourcepack_port=resourcepack_port if resourcepack_port is not None else instance_cfg['resourcepack_port'])
+    print("Resource pack file attached to '" + instance_name + "' successfully.")
+    return True
+
 
 def launch_server(instance_name):
     config = read_config()
@@ -386,6 +405,7 @@ def launch_server(instance_name):
         print(f"Instance '{instance_name}' not found.")
         return
 
+    set_resourcepack(instance_name)
     instance_path = Path(config['instances_folder']) / instance_name
     server_jar_path = instance_path / f"server.jar"
 
@@ -427,8 +447,6 @@ def launch_server(instance_name):
                 print("Failed to start resource pack HTTP server. Server might not function correctly regarding resource packs.")
 
         java_exec = "java"
-        if sys.platform == "win32":
-            java_exec = "java.exe"
 
         memory_allocation = instance.get('memory', EMPTY_INSTANCE_CFG['memory'])
 
@@ -443,10 +461,10 @@ def launch_server(instance_name):
         print(f"Network error during server launch (e.g., getting version info, downloading JAR): {e}")
     except ValueError as e:
         print(f"Configuration or version error: {e}")
-    except IOError as e:
-        print(f"File system error during server launch: {e}")
     except FileNotFoundError:
         print(f"Error: Java executable '{java_exec}' not found. Please ensure Java is installed and in your PATH.")
+    except IOError as e:
+        print(f"File system error during server launch: {e}")
     except Exception as e:
         print(f"An unexpected error occurred during server launch: {e}")
     finally:
@@ -486,16 +504,16 @@ def list_instances():
         print("No Minecraft server instances found.")
     return found_instances
 
-def edit_global_config(rp_ip=None, instances_folder=None):
+def edit_global_config(key=None, value=None):
     current_config = read_config()
     updated = False
 
-    if rp_ip is not None:
-        current_config["rp_ip"] = rp_ip
-        updated = True
-    if instances_folder is not None:
-        current_config["instances_folder"] = str(Path(instances_folder).absolute())
-        updated = True
+    if key is not None and value is not None:
+        if key not in current_config:
+            print(f"Warning: Key '{key}' not found in current config. Skipping.")
+        else:
+            current_config[key] = value
+            updated = True
 
     if updated:
         write_config(current_config)
@@ -507,8 +525,8 @@ def edit_global_config(rp_ip=None, instances_folder=None):
 def main():
     parser = argparse.ArgumentParser(description="Minecraft Server Launcher by MagnarIUK")
     parser.add_argument("-i", "--instance", help="Name of The Instance")
-    parser.add_argument("-v", "--version", help="Instance Version")
-    parser.add_argument("-m", "--memory",
+    parser.add_argument("-ver", "--version", help="Instance Version")
+    parser.add_argument("-mem", "--memory",
                         help="Memory allocation for the server (e.g., 1024M, 2G). Default is 2048M.")
     parser.add_argument("-ab","--auto-backup", action="store_true",
                         help="Enable automatic world backup before launching the server.")
@@ -519,19 +537,18 @@ def main():
                         help="Path to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
     parser.add_argument("-rpp", "--resourcepack-port", type=int,
                         help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.")
-    parser.add_argument("-g_rp_ip", "--global-resourcepack-ip",
-                        help="Global IP address for resource pack server (for 'edit-config' command).")
-    parser.add_argument("-g_if", "--global-instances-folder",
-                        help="Global path for server instances folder (for 'edit-config' command).")
-
+    parser.add_argument("-k", "--key",
+                        help="Key for editing configs (not instances).")
+    parser.add_argument("-v", "--value",
+                        help="Value for editing configs (not instances).")
     parser.add_argument("-c", "--command", required=True,
-                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config"],
-                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config'.")
+                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config", "edit-sp"],
+                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config', 'edit-sp'.")
 
 
     args = parser.parse_args()
 
-    instance_commands = ["create", "launch", "check", "edit", "backup", "delete", "open", "attach"]
+    instance_commands = ["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "edit-sp"]
     if args.command in instance_commands and not args.instance:
         parser.error(f"The '{args.command}' command requires the --instance (-i) argument.")
 
@@ -624,11 +641,22 @@ def main():
         attach_resourcepack(args.instance, args.resourcepack_file, args.resourcepack_port)
     elif args.command == "list":
         list_instances()
+
     elif args.command == "edit-config":
-        if not any([args.global_resourcepack_ip is not None, args.global_instances_folder is not None]):
-            print("Error: At least one of --global-resourcepack-ip or --global-instances-folder must be provided to edit global config.")
+        if not any([args.key is not None, args.value is not None]):
+            print("Error: Put in --key and --value to edit global config.")
             return
-        edit_global_config(rp_ip=args.global_resourcepack_ip, instances_folder=args.global_instances_folder)
+        edit_global_config(key=args.key, value=args.value)
+
+    elif args.command == "edit-sp":
+        if not any([args.key is not None, args.value is not None]):
+            print("Error: Put in --key and --value to edit global config.")
+            return
+        exists = check_instance(args.instance)
+        if exists:
+            update_server_properties(args.instance, args.key, args.value)
+        else:
+            print(f"Error: Instance '{args.instance}' does not exist.")
 
 
 if __name__ == "__main__":
