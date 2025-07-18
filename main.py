@@ -22,6 +22,7 @@ EMPTY_INSTANCE_CFG = {
     "name": "",
     "memory": "2048M",
     "auto_backup": False,
+    "host_resourcepack": False,
     "resourcepack": "",
     "resourcepack_port": 2548
 }
@@ -159,7 +160,11 @@ def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepac
     if auto_backup is not None:
         conf['auto_backup'] = auto_backup
     if resourcepack is not None:
-        conf['resourcepack'] = str(Path(resourcepack).absolute()) if resourcepack else ""
+        rp_is_link = True if resourcepack.startswith("http://") or resourcepack.startswith("https://") else False
+        if rp_is_link:
+            conf['resourcepack'] = resourcepack
+        else:
+            conf['resourcepack'] = str(Path(resourcepack).absolute()) if resourcepack else ""
     if resourcepack_port is not None:
         conf['resourcepack_port'] = resourcepack_port
 
@@ -267,6 +272,21 @@ def calculate_file_sha1(file_path):
     except Exception as e:
         print(f"Error calculating SHA1 for '{file_path}': {e}")
         return None
+def calculate_remote_file_sha1(url, chunk_size=8192):
+    sha1_hash = hashlib.sha1()
+    try:
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=chunk_size):
+                if chunk:
+                    sha1_hash.update(chunk)
+        return sha1_hash.hexdigest()
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading file from {url}: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
 
 def update_server_properties(instance_name, key, value):
     config = read_config()
@@ -350,36 +370,70 @@ def stop_resourcepack_http_server():
             print("Warning: Resource pack HTTP server thread did not terminate gracefully.")
         rp_server_thread = None
 
+
 def set_resourcepack(instance_name):
     config = read_config()
     instance_cfg = get_instance(instance_name)
-    rp_path = Path(instance_cfg['resourcepack'])
-    if not rp_path.is_file():
-        print(f"Error: Resource pack file '{rp_path.absolute()}' not found.")
-        return False
-    rp_sha1 = calculate_file_sha1(rp_path)
-    if not rp_sha1:
-        print("Failed to calculate resource pack SHA1. Aborting attachment.")
-        return False
+    rp_value = instance_cfg['resourcepack']
 
-    rp_ip = config.get("rp_ip")
-    if not rp_ip:
-        print("Error: Resource pack IP address (rp_ip) not set in main config. Please set it using 'edit-config' command or manually edit config.json.")
-        return False
+    if not rp_value:
+        print("No resource pack specified for this instance. Disabling resource pack settings in server.properties.")
+        update_server_properties(instance_name, "require-resource-pack", "false")
+        update_server_properties(instance_name, "resource-pack", "")
+        update_server_properties(instance_name, "resource-pack-sha1", "")
+        return True
 
-    rp_url = f"http://{rp_ip}:{instance_cfg['resourcepack_port']}/{rp_path.name}"
-    print(f"Constructed resource pack URL for server.properties: {rp_url}")
+    is_url = rp_value.startswith("http://") or rp_value.startswith("https://")
 
-    update_server_properties(instance_name, "require-resource-pack", "true")
+    if is_url:
+        rp_url = rp_value
+        print(f"Resource pack is a URL: {rp_url}")
+        print("No local hosting required.")
+        calculated_sha1 = calculate_remote_file_sha1(rp_url)
+        if not calculated_sha1:
+            print("Failed to calculate resource pack SHA1 for remote file. Aborting attachment.")
+            return False
+        rp_sha1 = calculated_sha1
+    else:
+        rp_path = Path(rp_value)
+        if not rp_path.is_file():
+            print(f"Error: Resource pack file '{rp_path.absolute()}' not found. Cannot attach.")
+            return False
+
+        calculated_sha1 = calculate_file_sha1(rp_path)
+        if not calculated_sha1:
+            print("Failed to calculate resource pack SHA1 for local file. Aborting attachment.")
+            return False
+        rp_sha1 = calculated_sha1
+
+        rp_ip = config.get("rp_ip")
+        if not rp_ip:
+            print(
+                "Error: Resource pack IP address (rp_ip) not set in main config. Please set it using 'edit-config' command or manually edit config.json.")
+            return False
+
+        rp_url = f"http://{rp_ip}:{instance_cfg['resourcepack_port']}/{rp_path.name}"
+        print(f"Constructed resource pack URL for server.properties (local file): {rp_url}")
+
+        print(f"Resource pack '{rp_path.name}' attached to instance '{instance_name}'.")
+        print(f"Minecraft clients will attempt to download it from: {rp_url}")
+
+        print(f"Starting local HTTP server for resource pack: {rp_path.name}")
+        if not start_resourcepack_http_server(rp_path, rp_ip, instance_cfg['resourcepack_port']):
+            print(
+                "Failed to start resource pack HTTP server. Server might not function correctly regarding resource packs.")
+
     update_server_properties(instance_name, "resource-pack", rp_url)
-    update_server_properties(instance_name, "resource-pack-sha1", rp_sha1)
+    if rp_sha1:
+        update_server_properties(instance_name, "resource-pack-sha1", rp_sha1)
+    else:
+        update_server_properties(instance_name, "resource-pack-sha1", "")
 
-    print(f"Resource pack '{rp_path.name}' attached to instance '{instance_name}'.")
-    print(f"Minecraft clients will attempt to download it from: {rp_url}")
+    print(f"Resource pack configuration for '{instance_name}' updated in server.properties.")
     return True
 
 
-def attach_resourcepack(instance_name, resourcepack_file_path, resourcepack_port=None):
+def attach_resourcepack(instance_name, resourcepack_value, resourcepack_port=None):
     config = read_config()
     instance_cfg = get_instance(instance_name)
 
@@ -387,14 +441,19 @@ def attach_resourcepack(instance_name, resourcepack_file_path, resourcepack_port
         print(f"Error: Instance '{instance_name}' does not exist. Please create it first.")
         return False
 
-    rp_path = Path(resourcepack_file_path)
-    if not rp_path.is_file():
-        print(f"Error: Resource pack file '{resourcepack_file_path}' not found.")
-        return False
+    is_url = resourcepack_value.startswith("http://") or resourcepack_value.startswith("https://")
 
-    edit_instance(instance_name, resourcepack=str(rp_path.absolute()),
+    if not is_url:
+        rp_path = Path(resourcepack_value)
+        if not rp_path.is_file():
+            print(f"Error: Resource pack file '{resourcepack_value}' not found.")
+            return False
+        resourcepack_value = str(rp_path.absolute())
+
+    edit_instance(instance_name,
+                  resourcepack=resourcepack_value,
                   resourcepack_port=resourcepack_port if resourcepack_port is not None else instance_cfg['resourcepack_port'])
-    print("Resource pack file attached to '" + instance_name + "' successfully.")
+    print("Resource pack information attached to '" + instance_name + "' successfully.")
     return True
 
 
@@ -405,7 +464,6 @@ def launch_server(instance_name):
         print(f"Instance '{instance_name}' not found.")
         return
 
-    set_resourcepack(instance_name)
     instance_path = Path(config['instances_folder']) / instance_name
     server_jar_path = instance_path / f"server.jar"
 
@@ -435,16 +493,23 @@ def launch_server(instance_name):
             download_server(server_jar_url, server_sha, server_jar_path)
         else:
             print("server.jar is up to date.")
-
-        resourcepack_file = instance.get('resourcepack')
-        resourcepack_port = instance.get('resourcepack_port')
-        if resourcepack_file and Path(resourcepack_file).is_file():
-            print(f"Resource pack '{Path(resourcepack_file).name}' detected. Starting HTTP server...")
-            rp_ip = config.get("rp_ip", EMPTY_CONFIG["rp_ip"])
-            if start_resourcepack_http_server(resourcepack_file, rp_ip, resourcepack_port):
-                print(f"Resource pack HTTP server started on {rp_ip}:{resourcepack_port} serving from '{Path(resourcepack_file).parent}'.")
-            else:
-                print("Failed to start resource pack HTTP server. Server might not function correctly regarding resource packs.")
+        set_resourcepack(instance_name)
+        # resourcepack_value = instance.get('resourcepack')
+        #
+        # should_host_rp = resourcepack_value and not (
+        #             resourcepack_value.startswith("http://") or resourcepack_value.startswith("https://"))
+        #
+        # if should_host_rp:
+        #     if not set_resourcepack(instance_name):
+        #         print(
+        #             "Warning: Failed to set resource pack or start local HTTP server. Server might not function correctly regarding resource packs.")
+        #
+        # elif resourcepack_value:
+        #     set_resourcepack(instance_name)
+        # else:
+        #     update_server_properties(instance_name, "require-resource-pack", "false")
+        #     update_server_properties(instance_name, "resource-pack", "")
+        #     update_server_properties(instance_name, "resource-pack-sha1", "")
 
         java_exec = "java"
 
@@ -533,8 +598,8 @@ def main():
     parser.add_argument("-nab","--no-auto-backup", action="store_false", dest="auto_backup",
                         help="Disable automatic world backup before launching the server.")
     parser.set_defaults(auto_backup=None)
-    parser.add_argument("-rp", "--resourcepack-file",
-                        help="Path to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
+    parser.add_argument("-rp", "--resourcepack",
+                        help="Path or link to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
     parser.add_argument("-rpp", "--resourcepack-port", type=int,
                         help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.")
     parser.add_argument("-k", "--key",
@@ -571,7 +636,7 @@ def main():
 
         memory_to_use = args.memory if args.memory else EMPTY_INSTANCE_CFG['memory']
         auto_backup_setting = args.auto_backup if args.auto_backup is not None else False
-        resourcepack_path = args.resourcepack_file if args.resourcepack_file else ""
+        resourcepack_path = args.resourcepack if args.resourcepack else ""
         resourcepack_port_setting = args.resourcepack_port if args.resourcepack_port is not None else EMPTY_INSTANCE_CFG['resourcepack_port']
 
         try:
@@ -592,12 +657,12 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
             return
-        if not any([args.version, args.memory, args.auto_backup is not None, args.resourcepack_file is not None, args.resourcepack_port is not None]):
+        if not any([args.version, args.memory, args.auto_backup is not None, args.resourcepack is not None, args.resourcepack_port is not None]):
             print("Error: At least one of version, memory, auto-backup, resource pack file, or resource pack port must be provided to edit an instance.")
             return
         try:
             edit_instance(args.instance, args.version, args.memory, args.auto_backup,
-                          resourcepack=args.resourcepack_file, resourcepack_port=args.resourcepack_port)
+                          resourcepack=args.resourcepack, resourcepack_port=args.resourcepack_port)
             print(f"Instance '{args.instance}' updated successfully.")
         except Exception as e:
             print(f"Failed to edit instance '{args.instance}': {e}")
@@ -635,10 +700,10 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist. Cannot attach resource pack.")
             return
-        if not args.resourcepack_file:
-            print("Error: A resource pack file path (--resourcepack-file or -rp) is required for the 'attach' command.")
+        if not args.resourcepack:
+            print("Error: A resource pack file path (--resourcepack or -rp) is required for the 'attach' command.")
             return
-        attach_resourcepack(args.instance, args.resourcepack_file, args.resourcepack_port)
+        attach_resourcepack(args.instance, args.resourcepack, args.resourcepack_port)
     elif args.command == "list":
         list_instances()
 
