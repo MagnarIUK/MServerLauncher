@@ -1,7 +1,9 @@
 import hashlib
+import random
+import string
 import sys
 import shutil
-import datetime
+from datetime import datetime, timedelta, timezone
 import http.server
 import socketserver
 import threading
@@ -15,6 +17,9 @@ import requests
 EMPTY_CONFIG = {
     "instances_folder": str(Path.home().joinpath(".minecraft/server_instances").absolute()),
     "rp_ip": "0.0.0.0",
+    "api": "",
+    "api_login": "",
+    "api_password": "",
 }
 
 EMPTY_INSTANCE_CFG = {
@@ -33,17 +38,73 @@ rp_server_thread = None
 def write_config(cfg):
     config_path = Path.home().joinpath(".minecraft/server_instances/config.json").absolute()
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(str(config_path), 'w') as f:
+    with open(config_path, 'w') as f:
         json.dump(cfg, f, indent=4)
 
 def read_config():
     config_path = Path.home().joinpath(".minecraft/server_instances/config.json").absolute()
+
     if config_path.exists():
-        with open(str(config_path), "r") as cfg:
-            return json.load(cfg)
+        with open(config_path, "r") as f:
+            cfg = json.load(f)
     else:
-        write_config(EMPTY_CONFIG)
-        return EMPTY_CONFIG
+        cfg = {}
+    updated = False
+    for key, value in EMPTY_CONFIG.items():
+        if key not in cfg:
+            cfg[key] = value
+            updated = True
+    if updated:
+        write_config(cfg)
+
+    return cfg
+
+
+def upload_file(file):
+    config = read_config()
+    file_path = Path(file)
+    if file_path.exists():
+        session = requests.Session()
+        print("Loging into the API...")
+        api = config['api']
+        api_login = config['api_login']
+        api_password = config['api_password']
+
+        login_response = session.post(api + "api/auth/login", data={
+            "username": api_login,
+            "password": api_password,
+        })
+        login_response.raise_for_status()
+        print("Uploading file...")
+        with open(file, 'rb') as f:
+            files = {
+                "file": (file_path.name, f, "application/zip")
+            }
+            password = generate_upload_password()
+            data = {
+                "expires_at": generate_expiry_date(),
+                "allow_direct_link": "true",
+                "create_short_link": "false",
+                "downloads_limit": "0",
+                "password": password
+            }
+            upload_response = session.post(api + "api/files/upload", files=files, data=data)
+            upload_response.raise_for_status()
+            res = upload_response.json()
+            print(res.get("message"))
+            return api + f"api/files/direct/{res['file_token']}.zip?password={password}"
+    return None
+
+def generate_expiry_date(days=30):
+    dt = datetime.now(timezone.utc) + timedelta(days=30)
+    return dt.isoformat(timespec='milliseconds')
+
+
+def generate_upload_password(n=14):
+    symbols = string.ascii_letters + string.digits
+    password = ''.join(random.choice(symbols) for _ in range(n))
+    return password
+
 
 def get_versions():
     response = requests.get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
@@ -245,7 +306,7 @@ def open_instance_folder(instance_name):
             os.startfile(str(instance_path))
         elif sys.platform == "darwin":
             subprocess.run(['open', str(instance_path)], check=True)
-        else: # Linux/Unix
+        else:
             subprocess.run(['xdg-open', str(instance_path)], check=True)
         print(f"Opened folder: {instance_path}")
         return True
@@ -494,22 +555,6 @@ def launch_server(instance_name):
         else:
             print("server.jar is up to date.")
         set_resourcepack(instance_name)
-        # resourcepack_value = instance.get('resourcepack')
-        #
-        # should_host_rp = resourcepack_value and not (
-        #             resourcepack_value.startswith("http://") or resourcepack_value.startswith("https://"))
-        #
-        # if should_host_rp:
-        #     if not set_resourcepack(instance_name):
-        #         print(
-        #             "Warning: Failed to set resource pack or start local HTTP server. Server might not function correctly regarding resource packs.")
-        #
-        # elif resourcepack_value:
-        #     set_resourcepack(instance_name)
-        # else:
-        #     update_server_properties(instance_name, "require-resource-pack", "false")
-        #     update_server_properties(instance_name, "resource-pack", "")
-        #     update_server_properties(instance_name, "resource-pack-sha1", "")
 
         java_exec = "java"
 
@@ -597,6 +642,7 @@ def main():
                         help="Enable automatic world backup before launching the server.")
     parser.add_argument("-nab","--no-auto-backup", action="store_false", dest="auto_backup",
                         help="Disable automatic world backup before launching the server.")
+    parser.add_argument("-urp","--upload-resourcepack", action="store_true", help="Upload the resourcepack to upload server.")
     parser.set_defaults(auto_backup=None)
     parser.add_argument("-rp", "--resourcepack",
                         help="Path or link to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
@@ -684,8 +730,8 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
             return
-        confirm = input(f"Are you sure you want to delete instance '{args.instance}' and all its data? (yes/no): ").lower()
-        if confirm == 'yes':
+        confirm = input(f"Are you sure you want to delete instance '{args.instance}' and all its data? (Y/n): ").lower()
+        if confirm == 'yes' or confirm == 'y' or confirm == '':
             delete_instance(args.instance)
         else:
             print("Deletion cancelled.")
@@ -703,7 +749,16 @@ def main():
         if not args.resourcepack:
             print("Error: A resource pack file path (--resourcepack or -rp) is required for the 'attach' command.")
             return
-        attach_resourcepack(args.instance, args.resourcepack, args.resourcepack_port)
+        if args.upload_resourcepack:
+            try:
+                link = upload_file(args.resourcepack)
+                print(link)
+                attach_resourcepack(args.instance, link)
+            except Exception as e:
+                print(f"Failed to upload resourcepack '{args.resourcepack}': {e}. Trying to attach file.")
+                attach_resourcepack(args.instance, args.resourcepack, args.resourcepack_port)
+        else:
+            attach_resourcepack(args.instance, args.resourcepack, args.resourcepack_port)
     elif args.command == "list":
         list_instances()
 
