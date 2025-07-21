@@ -11,6 +11,7 @@ import os
 import subprocess
 import json
 import argparse
+import zipfile
 from pathlib import Path
 import requests
 
@@ -20,6 +21,7 @@ EMPTY_CONFIG = {
     "api": "",
     "api_login": "",
     "api_password": "",
+    "backup_on_rollback": True,
 }
 
 EMPTY_INSTANCE_CFG = {
@@ -29,7 +31,15 @@ EMPTY_INSTANCE_CFG = {
     "auto_backup": False,
     "host_resourcepack": False,
     "resourcepack": "",
-    "resourcepack_port": 2548
+    "resourcepack_port": 2548,
+    "backups": {
+
+    }
+}
+EMPTY_BACKUP_CFG = {
+    "version": "",
+    "datetime": "",
+    "desc": ""
 }
 
 rp_httpd = None
@@ -197,7 +207,7 @@ def create_instance(name, version, memory, auto_backup=False, resourcepack="", r
             f.truncate()
 
 
-def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepack=None, resourcepack_port=None):
+def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepack=None, resourcepack_port=None, backups=None):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(name)
     instance_cfg_path = instance_path.joinpath("cfg.json")
@@ -228,6 +238,8 @@ def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepac
             conf['resourcepack'] = str(Path(resourcepack).absolute()) if resourcepack else ""
     if resourcepack_port is not None:
         conf['resourcepack_port'] = resourcepack_port
+    if backups is not None:
+        conf['backups'] = backups
 
     with open(instance_cfg_path, "w") as cfg_file:
         json.dump(conf, cfg_file, indent=4)
@@ -245,9 +257,46 @@ def get_instance(name):
             return instance_cfg
     return None
 
-def backup_instance(instance_name):
+def random_hex_number(size=1):
+    res = ""
+    for _ in range(size):
+        res += ''.join(random.choices('0123456789abcdef', k=2))
+    return res
+
+def zip_with_progress(source_path: Path, destination_path: Path):
+    file_list = []
+    for root, _, files in os.walk(source_path):
+        for file in files:
+            full_path = Path(root) / file
+            rel_path = full_path.relative_to(source_path)
+            file_list.append((full_path, rel_path))
+
+    total = len(file_list)
+    if total == 0:
+        print("No files to back up.")
+        return False
+
+    with zipfile.ZipFile(str(destination_path) + '.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for i, (full_path, rel_path) in enumerate(file_list, 1):
+            zipf.write(full_path, rel_path)
+            if i % max(1, total // 10) == 0 or i == total:
+                print(f"Backup progress: {i}/{total} files ({(i / total * 100):.0f}%)")
+
+    return True
+
+def backup_instance(instance_name, desc=""):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(instance_name)
+    instance_cfg = get_instance(instance_name)
+    backup = EMPTY_BACKUP_CFG.copy()
+    backup['version'] = instance_cfg['version']
+    timestamp = datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
+    backup['datetime'] = timestamp
+    backup['desc'] = desc
+    instance_backups = instance_cfg['backups']
+    backup_id = random_hex_number()
+    while backup_id in instance_backups:
+        backup_id = random_hex_number()
 
     if not instance_path.is_dir():
         print(f"Error: Instance folder '{instance_name}' not found at '{instance_path}'.")
@@ -256,24 +305,78 @@ def backup_instance(instance_name):
     backups_path = instance_path / "backups"
     backups_path.mkdir(exist_ok=True)
 
-    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     world_folder = instance_path / "world"
 
     source_path = world_folder
     if not world_folder.is_dir():
-        print(f"Warning: 'world' folder not found for instance '{instance_name}'. Backing up the entire instance directory.")
-        source_path = instance_path
+        print(f"Error: 'world' folder not found for instance '{instance_name}'.")
+        return False
 
-    backup_name = f"{timestamp}-world-backup" if world_folder.is_dir() else f"{timestamp}-instance-backup"
+    backup_name = f"{timestamp.replace('.', '').replace(":", '')}-world-backup" if world_folder.is_dir() else f"{timestamp}-instance-backup"
     destination_path = backups_path / backup_name
 
     try:
-        shutil.make_archive(str(destination_path), 'zip', str(source_path))
+        #shutil.make_archive(str(destination_path), 'zip', str(source_path))
+        if not zip_with_progress(source_path, destination_path):
+            return False
+
         print(f"Backup created successfully: {destination_path}.zip")
+        instance_backups[backup_id] = backup
+        edit_instance(instance_name, backups=instance_backups)
         return True
     except Exception as e:
         print(f"Error creating backup for '{instance_name}': {e}")
         return False
+
+def rollback_instance(instance_name, backup_id):
+    config = read_config()
+    instance_path = Path(config['instances_folder']) / instance_name
+    instance_cfg = get_instance(instance_name)
+
+    backups = instance_cfg.get("backups", {})
+    if backup_id not in backups:
+        print(f"Error: Backup ID '{backup_id}' not found for instance '{instance_name}'.")
+        return False
+
+    backup_info = backups[backup_id]
+    timestamp = backup_info['datetime']
+    version = backup_info['version']
+
+    file_name_base = f"{timestamp.replace('.', '').replace(':', '')}-world-backup"
+    backup_zip_path = instance_path / "backups" / f"{file_name_base}.zip"
+
+    if not backup_zip_path.exists():
+        print(f"Error: Backup file not found at '{backup_zip_path}'.")
+        return False
+
+    if config['backup_on_rollback']:
+        print(f"Creating automatic backup before rollback...")
+        if not backup_instance(instance_name, desc=f"Auto-backup before rollback to {backup_id}"):
+            print("Error: Failed to create backup before rollback. Aborting.")
+            return False
+
+    print(f"Rolling back instance '{instance_name}' using backup '{backup_id}'...")
+
+    world_folder = instance_path / "world"
+    if world_folder.exists():
+        try:
+            print("Deleting existing world folder...")
+            shutil.rmtree(world_folder)
+        except Exception as e:
+            print(f"Error removing old world folder: {e}")
+            return False
+
+    try:
+        print(f"Extracting backup '{backup_zip_path.name}' into 'world' folder...")
+        world_folder.mkdir(exist_ok=True)
+        with zipfile.ZipFile(backup_zip_path, 'r') as zip_ref:
+            zip_ref.extractall(world_folder)
+        print("Rollback complete.")
+        return True
+    except Exception as e:
+        print(f"Error during extraction: {e}")
+        return False
+
 
 def delete_instance(name):
     config = read_config()
@@ -414,7 +517,7 @@ def start_resourcepack_http_server(file_path, ip, port):
         return False
 
     server_directory = rp_path.parent
-    rp_server_thread = threading.Thread(target=_run_http_server, args=(str(server_directory.absolute()), ip, port), daemon=True)
+    rp_server_thread = threading.Thread(target=_run_http_server, args=(str(server_directory.absolute()), '0.0.0.0', port), daemon=True)
     rp_server_thread.start()
     return True
 
@@ -531,7 +634,7 @@ def launch_server(instance_name):
     try:
         if instance.get('auto_backup', False):
             print(f"Auto-backup enabled. Creating backup for '{instance_name}' before launch...")
-            if not backup_instance(instance_name):
+            if not backup_instance(instance_name, "Auto-backup"):
                 print("Auto-backup failed. Continuing with server launch anyway.")
             else:
                 print("Auto-backup completed.")
@@ -560,12 +663,31 @@ def launch_server(instance_name):
 
         memory_allocation = instance.get('memory', EMPTY_INSTANCE_CFG['memory'])
 
-        command = [java_exec, f"-Xmx{memory_allocation}", f"-Xms{memory_allocation}", "-jar", str(server_jar_path), "nogui"]
+        command = [java_exec, f"-Xmx{memory_allocation}", f"-Xms{memory_allocation}", "-jar", str(server_jar_path)]
+        needs_hosting = instance['resourcepack'].startswith("http://") or instance['resourcepack'].startswith("https://")
         print(f"Launching server with command: {' '.join(command)}")
-        server_process = subprocess.run(command, cwd=instance_path)
+        print(needs_hosting)
+        if needs_hosting:
+            command.append("nogui")
+            server_process = subprocess.run(command, cwd=instance_path)
 
-        stop_resourcepack_http_server()
-        print(f"Server '{instance_name}' exited with code {server_process.returncode}.")
+            print(f"Server '{instance_name}' exited with code {server_process.returncode}.")
+        else:
+            process = subprocess.Popen(
+                command,
+                cwd=instance_path,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True
+            )
+
+            def monitor_server():
+                print(f"Server process started with PID {process.pid}. Monitoring...")
+                process.wait()
+                print(f"Server '{instance_name}' exited with code {process.returncode}.")
+
+            threading.Thread(target=monitor_server, daemon=True).start()
 
     except requests.exceptions.RequestException as e:
         print(f"Network error during server launch (e.g., getting version info, downloading JAR): {e}")
@@ -579,6 +701,24 @@ def launch_server(instance_name):
         print(f"An unexpected error occurred during server launch: {e}")
     finally:
         stop_resourcepack_http_server()
+
+def list_backups(instance_name):
+    instance_cfg = get_instance(instance_name)
+    backups = instance_cfg.get("backups", {})
+
+    if not backups:
+        print(f"\nNo backups found for instance '{instance_name}'.")
+        return
+
+    print(f"\n--- Backups for {instance_name} ---")
+    print(f"{'ID':<10} {'Date/Time':<20} {'Version':<10} {'Description'}")
+    print(f"{'-' * 10:<10} {'-' * 20:<20} {'-' * 10:<10} {'-' * 40}")
+
+    for backup_id, info in backups.items():
+        desc = info.get("desc", "")
+        print(f"{backup_id:<10} {info.get('datetime', ''):<20} {info.get('version', ''):<10} {desc}")
+
+    print("------------------------------------------------------------")
 
 
 def list_instances():
@@ -631,7 +771,22 @@ def edit_global_config(key=None, value=None):
     else:
         print("No global configuration settings provided to update.")
 
+def edit_global_config(key=None, value=None):
+    current_config = read_config()
+    updated = False
 
+    if key is not None and value is not None:
+        if key not in current_config:
+            print(f"Warning: Key '{key}' not found in current config. Skipping.")
+        else:
+            current_config[key] = value
+            updated = True
+
+    if updated:
+        write_config(current_config)
+        print("Global configuration updated successfully.")
+    else:
+        print("No global configuration settings provided to update.")
 def main():
     parser = argparse.ArgumentParser(description="Minecraft Server Launcher by MagnarIUK")
     parser.add_argument("-i", "--instance", help="Name of The Instance")
@@ -642,7 +797,7 @@ def main():
                         help="Enable automatic world backup before launching the server.")
     parser.add_argument("-nab","--no-auto-backup", action="store_false", dest="auto_backup",
                         help="Disable automatic world backup before launching the server.")
-    parser.add_argument("-urp","--upload-resourcepack", action="store_true", help="Upload the resourcepack to upload server.")
+    parser.add_argument("-u","--upload", action="store_true", help="Upload the file to upload server.")
     parser.set_defaults(auto_backup=None)
     parser.add_argument("-rp", "--resourcepack",
                         help="Path or link to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
@@ -652,14 +807,16 @@ def main():
                         help="Key for editing configs (not instances).")
     parser.add_argument("-v", "--value",
                         help="Value for editing configs (not instances).")
+    parser.add_argument("-b", "--backup",
+                        help="Backup options for some commands.")
     parser.add_argument("-c", "--command", required=True,
-                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config", "edit-sp"],
-                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config', 'edit-sp'.")
+                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config", "edit-sp", "rollback"],
+                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config', 'edit-sp', 'rollback.")
 
 
     args = parser.parse_args()
 
-    instance_commands = ["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "edit-sp"]
+    instance_commands = ["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "edit-sp", "rollback"]
     if args.command in instance_commands and not args.instance:
         parser.error(f"The '{args.command}' command requires the --instance (-i) argument.")
 
@@ -698,7 +855,6 @@ def main():
         except Exception as e:
             print(f"Failed to create instance '{args.instance}': {e}")
 
-
     elif args.command == "edit":
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
@@ -713,7 +869,6 @@ def main():
         except Exception as e:
             print(f"Failed to edit instance '{args.instance}': {e}")
 
-
     elif args.command == "launch":
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
@@ -724,7 +879,19 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
             return
+        if args.backup:
+            backup_instance(args.instance, desc=args.backup)
+            return
         backup_instance(args.instance)
+
+    elif args.command == "rollback":
+        if not check_instance(args.instance):
+            print(f"Error: Instance '{args.instance}' does not exist.")
+            return
+        if not args.backup:
+            print(f"Specify backup if with '--backup' option.'")
+            return
+        rollback_instance(args.instance, args.backup)
 
     elif args.command == "delete":
         if not check_instance(args.instance):
@@ -749,7 +916,7 @@ def main():
         if not args.resourcepack:
             print("Error: A resource pack file path (--resourcepack or -rp) is required for the 'attach' command.")
             return
-        if args.upload_resourcepack:
+        if args.upload:
             try:
                 link = upload_file(args.resourcepack)
                 print(link)
@@ -759,7 +926,14 @@ def main():
                 attach_resourcepack(args.instance, args.resourcepack, args.resourcepack_port)
         else:
             attach_resourcepack(args.instance, args.resourcepack, args.resourcepack_port)
+
     elif args.command == "list":
+        if args.instance:
+            if not check_instance(args.instance):
+                print(f"Error: Instance '{args.instance}' does not exist.")
+                return
+            list_backups(args.instance)
+            return
         list_instances()
 
     elif args.command == "edit-config":
@@ -777,6 +951,7 @@ def main():
             update_server_properties(args.instance, args.key, args.value)
         else:
             print(f"Error: Instance '{args.instance}' does not exist.")
+
 
 
 if __name__ == "__main__":
