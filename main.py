@@ -124,7 +124,6 @@ def get_versions():
 def get_version(ver_id):
     versions_manifest = get_versions()
     versions = versions_manifest.get('versions')
-
     if ver_id == "latest" or ver_id == "l":
         ver_id = versions_manifest.get('latest').get("release")
     elif ver_id == "snapshot" or ver_id == "s":
@@ -171,9 +170,9 @@ def create_instance(name, version, memory, auto_backup=False, resourcepack="", r
     instance_path.mkdir(parents=True, exist_ok=True)
 
     resolved_version = version
-    if version == "latest" or version == "l":
+    if version in ("latest", "l"):
         resolved_version = get_versions().get('latest').get("release")
-    elif version == "snapshot" or version == "s":
+    elif version in ("snapshot", "s"):
         resolved_version = get_versions().get('latest').get("snapshot")
 
     instance_cfg_data = {
@@ -664,7 +663,7 @@ def launch_server(instance_name):
         memory_allocation = instance.get('memory', EMPTY_INSTANCE_CFG['memory'])
 
         command = [java_exec, f"-Xmx{memory_allocation}", f"-Xms{memory_allocation}", "-jar", str(server_jar_path)]
-        needs_hosting = instance['resourcepack'].startswith("http://") or instance['resourcepack'].startswith("https://")
+        needs_hosting = not (instance['resourcepack'].startswith("http://") or instance['resourcepack'].startswith("https://"))
         print(f"Launching server with command: {' '.join(command)}")
         print(needs_hosting)
         if needs_hosting:
