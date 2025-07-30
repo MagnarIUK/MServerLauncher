@@ -25,7 +25,14 @@ EMPTY_CONFIG = {
 }
 
 EMPTY_INSTANCE_CFG = {
-    "version": "",
+    "cfg_version": 2,
+    "version": {
+        "minecraft": "",
+        "loader": {
+            "type": "",
+            "version": ""
+        },
+    },
     "name": "",
     "memory": "2048M",
     "auto_backup": False,
@@ -59,6 +66,7 @@ def read_config():
             cfg = json.load(f)
     else:
         cfg = {}
+
     updated = False
     for key, value in EMPTY_CONFIG.items():
         if key not in cfg:
@@ -121,6 +129,41 @@ def get_versions():
     response.raise_for_status()
     return response.json()
 
+def get_fabric_loader_versions():
+    loader_response = requests.get("https://meta.fabricmc.net/v2/versions/loader")
+    loader_response.raise_for_status()
+    return loader_response.json()
+
+
+def get_fabric(version, loader="l",installer="l"):
+    loaders = get_fabric_loader_versions()
+
+    installer_response = requests.get("https://meta.fabricmc.net/v2/versions/installer")
+    installer_response.raise_for_status()
+    installers = installer_response.json()
+
+    loader_ver=loader
+    print(f'Loader version: {loader_ver}')
+    installer_ver=None
+    if loader in ("latest", "l"):
+        loader_ver = loaders[0].get('version')
+    else:
+        loader_ver = next((l for l in loaders if l.get("version") == loader), None)
+
+    if loader_ver is None:
+        print(f"Fabric '{loader_ver}' not found.")
+        return None
+    if installer_response is None:
+        print(f"Fabric '{installer_ver}' not found.")
+        return None
+
+    if installer in ("latest", "l"):
+        installer_ver = installers[0].get("version")
+    print(f"Version: {version}, Loader: {loader_ver.get('version')}, Installer: {installer_ver}")
+    url = f"https://meta.fabricmc.net/v2/versions/loader/{version}/{loader_ver.get('version')}/{installer_ver}/server/jar"
+
+    return url
+
 def get_version(ver_id):
     versions_manifest = get_versions()
     versions = versions_manifest.get('versions')
@@ -164,19 +207,32 @@ def check_instance(name):
     instance_path = instances_path.joinpath(name)
     return instance_path.is_dir() and instance_path.joinpath("cfg.json").exists()
 
-def create_instance(name, version, memory, auto_backup=False, resourcepack="", resourcepack_port=2548):
+def create_instance(name, version, memory, auto_backup=False, resourcepack="", resourcepack_port=2548, loader="vanilla", loader_version="latest"):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(name)
     instance_path.mkdir(parents=True, exist_ok=True)
 
     resolved_version = version
+
+    loaders = ("vanilla", "fabric")
+    if loader not in loaders:
+        print(f"{loader} is not valid loader.")
+        return False
+
+
     if version in ("latest", "l"):
         resolved_version = get_versions().get('latest').get("release")
     elif version in ("snapshot", "s"):
         resolved_version = get_versions().get('latest').get("snapshot")
 
     instance_cfg_data = {
-        "version": resolved_version,
+        "version": {
+        "minecraft": resolved_version,
+        "loader": {
+            "type": loader,
+            "version": loader_version
+        },
+    },
         "name": name,
         "memory": memory,
         "auto_backup": auto_backup,
@@ -185,6 +241,7 @@ def create_instance(name, version, memory, auto_backup=False, resourcepack="", r
     }
     with open(instance_path.joinpath("cfg.json"), "w") as cfg_file:
         json.dump(instance_cfg_data, cfg_file, indent=4)
+
 
     eula_path = instance_path.joinpath("eula.txt")
     if not eula_path.exists():
@@ -204,9 +261,15 @@ def create_instance(name, version, memory, auto_backup=False, resourcepack="", r
             if not updated and "eula=true" not in [l.strip() for l in lines]:
                 f.write("eula=true\n")
             f.truncate()
+    print(f"Instance '{name}' created successfully.")
+    print(f"  Version: {loader} {resolved_version}")
+    print(f"  Memory: {memory}")
+    print(f"  Auto-backup: {'Enabled' if auto_backup else 'Disabled'}")
+    if resourcepack:
+        print(f"  Resource pack: '{Path(resourcepack).name}' on port {resourcepack_port}")
+    return True
 
-
-def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepack=None, resourcepack_port=None, backups=None):
+def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepack=None, resourcepack_port=None, backups=None, loader=None, loader_version=None):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(name)
     instance_cfg_path = instance_path.joinpath("cfg.json")
@@ -224,7 +287,7 @@ def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepac
             resolved_version = get_versions().get('latest').get("snapshot")
         else:
             resolved_version = version
-        conf['version'] = resolved_version
+        conf['version']['minecraft'] = resolved_version
     if memory:
         conf['memory'] = memory
     if auto_backup is not None:
@@ -239,7 +302,25 @@ def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepac
         conf['resourcepack_port'] = resourcepack_port
     if backups is not None:
         conf['backups'] = backups
+    if loader is not None:
+        loaders = ("vanilla", "fabric")
+        if loader in loaders:
+            conf['version']['loader']['type'] = loader
+        else:
+            print(f"{loader} is not valid or supported loader.")
 
+        if conf['version']['loader']['version'] == "":
+            conf['version']['loader']['version'] = get_fabric_loader_versions()[0].get('version')
+    if loader_version is not None:
+        versions = get_fabric_loader_versions()
+        if loader_version in ("latest", "l"):
+            conf['version']['loader']['version'] = versions[0].get("version")
+        else:
+            for ver in versions:
+                if ver.get('version') == loader_version:
+                    conf['version']['loader']['version'] = loader_version
+                    break
+            print(f"{loader_version} is not valid or supported loader version.")
     with open(instance_cfg_path, "w") as cfg_file:
         json.dump(conf, cfg_file, indent=4)
 
@@ -250,6 +331,18 @@ def get_instance(name):
     if instance_config_path.exists():
         with open(instance_config_path, "r") as f:
             instance_cfg = json.load(f)
+            if instance_cfg.get("cfg_version") is None:
+                 ver = instance_cfg["version"]
+                 instance_cfg["cfg_version"] = EMPTY_INSTANCE_CFG.get("cfg_version")
+                 instance_cfg["version"] ={
+                 "minecraft": ver,
+                 "loader": {
+                     "type": "vanilla",
+                     "version": ""
+                    }
+                 }
+                 with open(instance_config_path, "w") as f2:
+                    json.dump(instance_cfg, f2, indent=4)
             for key, default_value in EMPTY_INSTANCE_CFG.items():
                 if key not in instance_cfg:
                     instance_cfg[key] = default_value
@@ -288,7 +381,7 @@ def backup_instance(instance_name, desc=""):
     instance_path = Path(config['instances_folder']).joinpath(instance_name)
     instance_cfg = get_instance(instance_name)
     backup = EMPTY_BACKUP_CFG.copy()
-    backup['version'] = instance_cfg['version']
+    backup['version'] = instance_cfg['version']['minecraft']
     timestamp = datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
     backup['datetime'] = timestamp
     backup['desc'] = desc
@@ -638,9 +731,16 @@ def launch_server(instance_name):
             else:
                 print("Auto-backup completed.")
 
-        ver = get_version(instance.get('version'))
+        ver = get_version(instance['version']['minecraft'])
         server_jar_url = ver.get('downloads', {}).get('server', {}).get('url')
         server_sha = ver.get('downloads', {}).get('server', {}).get('sha1')
+        match instance['version']['loader']['type']:
+            case "vanilla":
+                server_jar_url = ver.get('downloads', {}).get('server', {}).get('url')
+                server_sha = ver.get('downloads', {}).get('server', {}).get('sha1')
+            case "fabric":
+                server_jar_url = get_fabric(version=instance['version']['minecraft'], loader=instance['version']['loader']['version'])
+                server_sha = calculate_remote_file_sha1(server_jar_url)
 
         if not server_jar_url or not server_sha:
             print("Server download information missing from version manifest.")
@@ -663,7 +763,8 @@ def launch_server(instance_name):
         memory_allocation = instance.get('memory', EMPTY_INSTANCE_CFG['memory'])
 
         command = [java_exec, f"-Xmx{memory_allocation}", f"-Xms{memory_allocation}", "-jar", str(server_jar_path)]
-        needs_hosting = not (instance['resourcepack'].startswith("http://") or instance['resourcepack'].startswith("https://"))
+        respack = instance.get('resourcepack', '')
+        needs_hosting = bool(respack) and not (respack.startswith("http://") or respack.startswith("https://"))
         print(f"Launching server with command: {' '.join(command)}")
         print(needs_hosting)
         if needs_hosting:
@@ -701,6 +802,7 @@ def launch_server(instance_name):
     finally:
         stop_resourcepack_http_server()
 
+
 def list_backups(instance_name):
     instance_cfg = get_instance(instance_name)
     backups = instance_cfg.get("backups", {})
@@ -717,7 +819,7 @@ def list_backups(instance_name):
         desc = info.get("desc", "")
         print(f"{backup_id:<10} {info.get('datetime', ''):<20} {info.get('version', ''):<10} {desc}")
 
-    print("------------------------------------------------------------")
+    print("-----------------------------------------------------------------------------------------------------")
 
 
 def list_instances():
@@ -731,12 +833,11 @@ def list_instances():
             cfg_file = instance_dir / "cfg.json"
             if cfg_file.exists():
                 try:
-                    with open(cfg_file, 'r') as f:
-                        instance_cfg = json.load(f)
-                        name = instance_cfg.get('name', instance_dir.name)
-                        version = instance_cfg.get('version', 'N/A')
-                        memory = instance_cfg.get('memory', EMPTY_INSTANCE_CFG['memory'])
-                        found_instances.append({"name": name, "version": version, "memory": memory})
+                    inst = get_instance(instance_dir.name)
+                    found_instances.append({
+                        "name": instance_dir.name,
+                        "instance": inst,
+                    })
                 except json.JSONDecodeError:
                     print(f"Warning: Could not read cfg.json for instance '{instance_dir.name}'. Skipping.")
                 except Exception as e:
@@ -744,11 +845,11 @@ def list_instances():
 
     if found_instances:
         print("\n--- Available Minecraft Server Instances ---")
-        print(f"{'Name':<20} {'Version':<15} {'Memory':<10}")
-        print(f"{'-'*20:<20} {'-'*15:<15} {'-'*10:<10}")
+        print(f"{'Name':<20} {'Loader':<15} {'Version':<15} {'Memory':<10}")
+        print(f"{'-'*20:<20} {'-'*15:<15} {'-'*15:<15} {'-'*10:<10}")
         for instance in found_instances:
-            print(f"{instance['name']:<20} {instance['version']:<15} {instance['memory']:<10}")
-        print("------------------------------------------")
+            print(f"{instance['name']:<20} {instance['instance']['version']['loader']['type']:<15}  {instance['instance']['version']['minecraft']:<15} {instance['instance']['memory']:<10}")
+        print("-"*63)
     else:
         print("No Minecraft server instances found.")
     return found_instances
@@ -770,28 +871,14 @@ def edit_global_config(key=None, value=None):
     else:
         print("No global configuration settings provided to update.")
 
-def edit_global_config(key=None, value=None):
-    current_config = read_config()
-    updated = False
-
-    if key is not None and value is not None:
-        if key not in current_config:
-            print(f"Warning: Key '{key}' not found in current config. Skipping.")
-        else:
-            current_config[key] = value
-            updated = True
-
-    if updated:
-        write_config(current_config)
-        print("Global configuration updated successfully.")
-    else:
-        print("No global configuration settings provided to update.")
 def main():
     parser = argparse.ArgumentParser(description="Minecraft Server Launcher by MagnarIUK")
     parser.add_argument("-i", "--instance", help="Name of The Instance")
     parser.add_argument("-ver", "--version", help="Instance Version")
     parser.add_argument("-mem", "--memory",
                         help="Memory allocation for the server (e.g., 1024M, 2G). Default is 2048M.")
+    parser.add_argument("-load", "--loader", help="Instance loader. Default is vanilla")
+    parser.add_argument("-lver", "--loader-version", help="Version of loader. Default is latest")
     parser.add_argument("-ab","--auto-backup", action="store_true",
                         help="Enable automatic world backup before launching the server.")
     parser.add_argument("-nab","--no-auto-backup", action="store_false", dest="auto_backup",
@@ -832,25 +919,20 @@ def main():
             print(f"Error: Instance '{args.instance}' already exists.")
             return
 
-        if not args.version:
-            print("Error: Version is required to create an instance.")
-            return
-
         memory_to_use = args.memory if args.memory else EMPTY_INSTANCE_CFG['memory']
+        version_to_use = args.version if args.version else "latest"
         auto_backup_setting = args.auto_backup if args.auto_backup is not None else False
+        loader = args.loader if args.loader else "vanilla"
+        loader_ver = args.loader_version if args.loader_version else "latest"
         resourcepack_path = args.resourcepack if args.resourcepack else ""
         resourcepack_port_setting = args.resourcepack_port if args.resourcepack_port is not None else EMPTY_INSTANCE_CFG['resourcepack_port']
 
         try:
-            create_instance(args.instance, args.version, memory_to_use, auto_backup_setting,
+            create_instance(args.instance, version_to_use, memory_to_use, auto_backup_setting,
                             resourcepack=resourcepack_path,
-                            resourcepack_port=resourcepack_port_setting)
-            print(f"Instance '{args.instance}' created successfully.")
-            print(f"  Version: {args.version}")
-            print(f"  Memory: {memory_to_use}")
-            print(f"  Auto-backup: {'Enabled' if auto_backup_setting else 'Disabled'}")
-            if resourcepack_path:
-                print(f"  Resource pack: '{Path(resourcepack_path).name}' on port {resourcepack_port_setting}")
+                            resourcepack_port=resourcepack_port_setting,
+                            loader=loader,
+                            loader_version=loader_ver)
         except Exception as e:
             print(f"Failed to create instance '{args.instance}': {e}")
 
@@ -858,12 +940,12 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
             return
-        if not any([args.version, args.memory, args.auto_backup is not None, args.resourcepack is not None, args.resourcepack_port is not None]):
-            print("Error: At least one of version, memory, auto-backup, resource pack file, or resource pack port must be provided to edit an instance.")
+        if not any([args.version, args.memory, args.auto_backup is not None, args.resourcepack is not None, args.resourcepack_port is not None, args.loader is not None, args.loader_version is not None]):
+            print("Error: At least one of version, memory, loader, loader-version, auto-backup, resource pack file or resource pack port must be provided to edit an instance.")
             return
         try:
             edit_instance(args.instance, args.version, args.memory, args.auto_backup,
-                          resourcepack=args.resourcepack, resourcepack_port=args.resourcepack_port)
+                          resourcepack=args.resourcepack, resourcepack_port=args.resourcepack_port, loader=args.loader, loader_version=args.loader_version)
             print(f"Instance '{args.instance}' updated successfully.")
         except Exception as e:
             print(f"Failed to edit instance '{args.instance}': {e}")
@@ -872,6 +954,7 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
             return
+
         launch_server(args.instance)
 
     elif args.command == "backup":
