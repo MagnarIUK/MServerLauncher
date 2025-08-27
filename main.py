@@ -2,6 +2,7 @@ import hashlib
 import random
 import string
 import sys
+import psutil, signal
 import shutil
 from datetime import datetime, timedelta, timezone
 import http.server
@@ -13,6 +14,8 @@ import json
 import argparse
 import zipfile
 from pathlib import Path
+from tokenize import String
+
 import requests
 
 EMPTY_CONFIG = {
@@ -22,6 +25,12 @@ EMPTY_CONFIG = {
     "api_login": "",
     "api_password": "",
     "backup_on_rollback": True,
+    "launched": []
+}
+EMPTY_LAUNCHED_CONFIG = {
+    "instance": "",
+    "pid": 0,
+    "launched_at": datetime.now(timezone.utc).isoformat(),
 }
 
 EMPTY_INSTANCE_CFG = {
@@ -36,11 +45,9 @@ EMPTY_INSTANCE_CFG = {
     "name": "",
     "memory": "2048M",
     "auto_backup": False,
-    "host_resourcepack": False,
     "resourcepack": "",
     "resourcepack_port": 2548,
     "backups": {
-
     }
 }
 EMPTY_BACKUP_CFG = {
@@ -167,6 +174,7 @@ def get_fabric(version, loader="l",installer="l"):
 def get_version(ver_id):
     versions_manifest = get_versions()
     versions = versions_manifest.get('versions')
+    print(f"Looking for version {ver_id}...")
     if ver_id == "latest" or ver_id == "l":
         ver_id = versions_manifest.get('latest').get("release")
     elif ver_id == "snapshot" or ver_id == "s":
@@ -207,38 +215,52 @@ def check_instance(name):
     instance_path = instances_path.joinpath(name)
     return instance_path.is_dir() and instance_path.joinpath("cfg.json").exists()
 
+def check_minecraft_version(ver):
+    if ver in ("latest", "l", "snapshot", "s"):
+        return True
+    else:
+        try:
+            version = get_version(ver)
+            if version is not None:
+                print(f"Version {ver} is found")
+                return True
+            else:
+                print(f"Version {ver} is NOT found")
+                return False
+        except ValueError as e:
+            print(f"Version {ver} does not exist: \n {e}")
+            return False
+
+
 def create_instance(name, version, memory, auto_backup=False, resourcepack="", resourcepack_port=2548, loader="vanilla", loader_version="latest"):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(name)
     instance_path.mkdir(parents=True, exist_ok=True)
 
-    resolved_version = version
 
     loaders = ("vanilla", "fabric")
     if loader not in loaders:
         print(f"{loader} is not valid loader.")
         return False
 
+    if not check_minecraft_version(version):
+        print(f"{version} is not a valid minecraft version.")
+        return False
 
-    if version in ("latest", "l"):
-        resolved_version = get_versions().get('latest').get("release")
-    elif version in ("snapshot", "s"):
-        resolved_version = get_versions().get('latest').get("snapshot")
 
-    instance_cfg_data = {
-        "version": {
-        "minecraft": resolved_version,
+    instance_cfg_data = EMPTY_INSTANCE_CFG.copy()
+    instance_cfg_data['name'] = name
+    instance_cfg_data['memory'] = memory
+    instance_cfg_data['auto_backup'] = auto_backup
+    instance_cfg_data['resourcepack'] = resourcepack
+    instance_cfg_data['resourcepack_port'] = resourcepack_port
+    instance_cfg_data['version'] = {
+        "minecraft": version,
         "loader": {
             "type": loader,
             "version": loader_version
-        },
-    },
-        "name": name,
-        "memory": memory,
-        "auto_backup": auto_backup,
-        "resourcepack": resourcepack,
-        "resourcepack_port": resourcepack_port
-    }
+            }
+        }
     with open(instance_path.joinpath("cfg.json"), "w") as cfg_file:
         json.dump(instance_cfg_data, cfg_file, indent=4)
 
@@ -262,7 +284,7 @@ def create_instance(name, version, memory, auto_backup=False, resourcepack="", r
                 f.write("eula=true\n")
             f.truncate()
     print(f"Instance '{name}' created successfully.")
-    print(f"  Version: {loader} {resolved_version}")
+    print(f"  Version: {loader} {version}")
     print(f"  Memory: {memory}")
     print(f"  Auto-backup: {'Enabled' if auto_backup else 'Disabled'}")
     if resourcepack:
@@ -280,14 +302,8 @@ def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepac
     with open(instance_cfg_path, "r") as f:
         conf = json.load(f)
 
-    if version:
-        if version == "latest" or version == "l":
-            resolved_version = get_versions().get('latest').get("release")
-        elif version == "snapshot" or version == "s":
-            resolved_version = get_versions().get('latest').get("snapshot")
-        else:
-            resolved_version = version
-        conf['version']['minecraft'] = resolved_version
+    if version and check_minecraft_version(version):
+        conf['version']['minecraft'] = version
     if memory:
         conf['memory'] = memory
     if auto_backup is not None:
@@ -324,7 +340,7 @@ def edit_instance(name, version=None, memory=None, auto_backup=None, resourcepac
     with open(instance_cfg_path, "w") as cfg_file:
         json.dump(conf, cfg_file, indent=4)
 
-def get_instance(name):
+def get_instance(name: str):
     cfg = read_config()
     instances_path = Path(cfg['instances_folder'])
     instance_config_path = instances_path / name / "cfg.json"
@@ -334,13 +350,14 @@ def get_instance(name):
             if instance_cfg.get("cfg_version") is None:
                  ver = instance_cfg["version"]
                  instance_cfg["cfg_version"] = EMPTY_INSTANCE_CFG.get("cfg_version")
-                 instance_cfg["version"] ={
-                 "minecraft": ver,
-                 "loader": {
-                     "type": "vanilla",
-                     "version": ""
-                    }
-                 }
+                 if isinstance(ver, str):
+                     instance_cfg["version"] ={
+                         "minecraft": ver,
+                         "loader": {
+                             "type": "vanilla",
+                             "version": ""
+                            }
+                         }
                  with open(instance_config_path, "w") as f2:
                     json.dump(instance_cfg, f2, indent=4)
             for key, default_value in EMPTY_INSTANCE_CFG.items():
@@ -349,7 +366,7 @@ def get_instance(name):
             return instance_cfg
     return None
 
-def random_hex_number(size=1):
+def random_hex_number(size: int=1):
     res = ""
     for _ in range(size):
         res += ''.join(random.choices('0123456789abcdef', k=2))
@@ -376,7 +393,7 @@ def zip_with_progress(source_path: Path, destination_path: Path):
 
     return True
 
-def backup_instance(instance_name, desc=""):
+def backup_instance(instance_name: str, desc: str=""):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(instance_name)
     instance_cfg = get_instance(instance_name)
@@ -420,7 +437,7 @@ def backup_instance(instance_name, desc=""):
         print(f"Error creating backup for '{instance_name}': {e}")
         return False
 
-def rollback_instance(instance_name, backup_id):
+def rollback_instance(instance_name: str, backup_id: str):
     config = read_config()
     instance_path = Path(config['instances_folder']) / instance_name
     instance_cfg = get_instance(instance_name)
@@ -470,7 +487,7 @@ def rollback_instance(instance_name, backup_id):
         return False
 
 
-def delete_instance(name):
+def delete_instance(name: str):
     config = read_config()
     instances_path = Path(config['instances_folder'])
     instance_path = instances_path / name
@@ -487,7 +504,7 @@ def delete_instance(name):
         print(f"Error deleting instance '{name}': {e}")
         return False
 
-def open_instance_folder(instance_name):
+def open_instance_folder(instance_name: str):
     config = read_config()
     instance_path = Path(config['instances_folder']).joinpath(instance_name)
 
@@ -515,7 +532,7 @@ def open_instance_folder(instance_name):
         print(f"An unexpected error occurred while trying to open folder: {e}")
         return False
 
-def calculate_file_sha1(file_path):
+def calculate_file_sha1(file_path: str):
     sha1 = hashlib.sha1()
     try:
         with open(file_path, 'rb') as f:
@@ -528,7 +545,7 @@ def calculate_file_sha1(file_path):
     except Exception as e:
         print(f"Error calculating SHA1 for '{file_path}': {e}")
         return None
-def calculate_remote_file_sha1(url, chunk_size=8192):
+def calculate_remote_file_sha1(url: str, chunk_size: int=8192):
     sha1_hash = hashlib.sha1()
     try:
         with requests.get(url, stream=True) as r:
@@ -544,7 +561,7 @@ def calculate_remote_file_sha1(url, chunk_size=8192):
         print(f"An unexpected error occurred: {e}")
         return None
 
-def update_server_properties(instance_name, key, value):
+def update_server_properties(instance_name: str, key: str, value):
     config = read_config()
 
     server_properties_path = Path(config['instances_folder']).joinpath(f"{instance_name}/server.properties")
@@ -601,7 +618,7 @@ def _run_http_server(directory, ip, port):
     finally:
         os.chdir(current_working_directory)
 
-def start_resourcepack_http_server(file_path, ip, port):
+def start_resourcepack_http_server(file_path: str, ip: str, port: int):
     global rp_server_thread
     rp_path = Path(file_path)
     if not rp_path.is_file():
@@ -627,7 +644,7 @@ def stop_resourcepack_http_server():
         rp_server_thread = None
 
 
-def set_resourcepack(instance_name):
+def set_resourcepack(instance_name: str):
     config = read_config()
     instance_cfg = get_instance(instance_name)
     rp_value = instance_cfg['resourcepack']
@@ -689,7 +706,7 @@ def set_resourcepack(instance_name):
     return True
 
 
-def attach_resourcepack(instance_name, resourcepack_value, resourcepack_port=None):
+def attach_resourcepack(instance_name: str, resourcepack_value: str, resourcepack_port: str=None):
     config = read_config()
     instance_cfg = get_instance(instance_name)
 
@@ -713,7 +730,7 @@ def attach_resourcepack(instance_name, resourcepack_value, resourcepack_port=Non
     return True
 
 
-def launch_server(instance_name):
+def launch_server(instance_name: str):
     config = read_config()
     instance = get_instance(instance_name)
     if not instance:
@@ -782,12 +799,12 @@ def launch_server(instance_name):
                 start_new_session=True
             )
 
-            def monitor_server():
-                print(f"Server process started with PID {process.pid}. Monitoring...")
+            def server():
+                print(f"Server process started with PID {process.pid}.")
                 process.wait()
                 print(f"Server '{instance_name}' exited with code {process.returncode}.")
 
-            threading.Thread(target=monitor_server, daemon=True).start()
+            threading.Thread(target=server, daemon=True).start()
 
     except requests.exceptions.RequestException as e:
         print(f"Network error during server launch (e.g., getting version info, downloading JAR): {e}")
@@ -803,7 +820,7 @@ def launch_server(instance_name):
         stop_resourcepack_http_server()
 
 
-def list_backups(instance_name):
+def list_backups(instance_name: str):
     instance_cfg = get_instance(instance_name)
     backups = instance_cfg.get("backups", {})
 
@@ -870,6 +887,55 @@ def edit_global_config(key=None, value=None):
         print("Global configuration updated successfully.")
     else:
         print("No global configuration settings provided to update.")
+
+def add_launched(instance: str, pid: int):
+    cfg = read_config()
+    entry = EMPTY_LAUNCHED_CONFIG.copy()
+    entry['pid'] = pid
+    entry['instance'] = instance
+    cfg['launched'].append(entry)
+    write_config(cfg)
+
+
+def check_launched():
+    cfg = read_config()
+    alive = []
+    updated = False
+
+    for entry in cfg['launched']:
+        pid = entry['pid']
+        try:
+            proc = psutil.Process(pid)
+            if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                alive.append(entry)
+            else:
+                updated = True
+        except psutil.NoSuchProcess:
+            updated = True
+    if updated:
+        cfg['launched'] = alive
+        write_config(cfg)
+    return alive
+
+def remove_launched(pid: int):
+    cfg = read_config()
+    before = len(cfg['launched'])
+    cfg['launched'] = [e for e in cfg['launched'] if e['pid'] != pid ]
+    if len(cfg['launched']) != before:
+        write_config(cfg)
+
+def kill_launched(pid: int):
+    try:
+        proc = psutil.Process(pid)
+        proc.terminate()
+        proc.wait(timeout=10)
+    except psutil.NoSuchProcess:
+        pass
+    except psutil.TimeoutExpired:
+        proc.kill()
+
+    remove_launched(pid)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Minecraft Server Launcher by MagnarIUK")
