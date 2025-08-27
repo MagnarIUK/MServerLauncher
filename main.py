@@ -25,6 +25,7 @@ EMPTY_CONFIG = {
     "api_login": "",
     "api_password": "",
     "backup_on_rollback": True,
+    "use_gui_by_default": True,
     "launched": []
 }
 EMPTY_LAUNCHED_CONFIG = {
@@ -730,7 +731,7 @@ def attach_resourcepack(instance_name: str, resourcepack_value: str, resourcepac
     return True
 
 
-def launch_server(instance_name: str):
+def launch_server(instance_name: str, no_gui=False):
     config = read_config()
     instance = get_instance(instance_name)
     if not instance:
@@ -783,8 +784,13 @@ def launch_server(instance_name: str):
         respack = instance.get('resourcepack', '')
         needs_hosting = bool(respack) and not (respack.startswith("http://") or respack.startswith("https://"))
         print(f"Launching server with command: {' '.join(command)}")
-        print(needs_hosting)
-        if needs_hosting:
+        use_gui_by_default = config.get("use_gui_by_default", True)
+        use_gui = use_gui_by_default ^ no_gui
+
+        print(f"Use Gui: {use_gui}")
+        print(f"Needs hosting: {needs_hosting}")
+
+        if needs_hosting or not use_gui:
             command.append("nogui")
             server_process = subprocess.run(command, cwd=instance_path)
 
@@ -961,6 +967,8 @@ def main():
                         help="Value for editing configs (not instances).")
     parser.add_argument("-b", "--backup",
                         help="Backup options for some commands.")
+    parser.add_argument("-gui", "--gui",action="store_true",
+                        help="Reverses default option.")
     parser.add_argument("-c", "--command", required=True,
                         choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config", "edit-sp", "rollback"],
                         help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config', 'edit-sp', 'rollback.")
@@ -1020,8 +1028,9 @@ def main():
         if not check_instance(args.instance):
             print(f"Error: Instance '{args.instance}' does not exist.")
             return
+        cfg = read_config()
 
-        launch_server(args.instance)
+        launch_server(args.instance, args.gui)
 
     elif args.command == "backup":
         if not check_instance(args.instance):
