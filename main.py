@@ -730,17 +730,6 @@ def attach_resourcepack(instance_name: str, resourcepack_value: str, resourcepac
     print("Resource pack information attached to '" + instance_name + "' successfully.")
     return True
 
-def get_version_name_download(ver):
-    manifest = get_versions()
-    if ver in ('l', 'latest'):
-        version = manifest.get('latest').get("release")
-        return f"latest version - {version}"
-    elif ver in ('s', 'snapshot'):
-        version = manifest.get('latest').get("snapshot")
-        return f"latest snapshot - {version}"
-    else:
-        return ver
-
 def launch_server(instance_name: str, no_gui=False):
     config = read_config()
     instance = get_instance(instance_name)
@@ -835,24 +824,89 @@ def launch_server(instance_name: str, no_gui=False):
     finally:
         stop_resourcepack_http_server()
 
-
 def list_backups(instance_name: str):
     instance_cfg = get_instance(instance_name)
+    instance_path = Path(read_config()['instances_folder']) / instance_name
+    backups_path = instance_path / "backups"
+
     backups = instance_cfg.get("backups", {})
 
     if not backups:
         print(f"\nNo backups found for instance '{instance_name}'.")
         return
 
-    print(f"\n--- Backups for {instance_name} ---")
-    print(f"{'ID':<10} {'Date/Time':<20} {'Version':<10} {'Description'}")
-    print(f"{'-' * 10:<10} {'-' * 20:<20} {'-' * 10:<10} {'-' * 40}")
+    title = f"--- Backups for {instance_name} ---"
+    columns = [('ID',10),('Date/Time',20),('Version',10),('Description',40)]
+    table = Table(title, columns)
 
+    table.print_header()
+    removed = []
     for backup_id, info in backups.items():
-        desc = info.get("desc", "")
-        print(f"{backup_id:<10} {info.get('datetime', ''):<20} {info.get('version', ''):<10} {desc}")
+        ts = info.get("datetime", "").replace(".", "").replace(":", "")
+        backup_name = f"{ts}-world-backup.zip"
+        backup_file = backups_path / backup_name
 
-    print("-----------------------------------------------------------------------------------------------------")
+        if not backup_file.exists():
+            print(f"Missing backup {backup_id} ({backup_name}), removing from config...")
+            removed.append(backup_id)
+            continue
+
+        desc = info.get("desc", "")
+        table.print_row([backup_id, info.get('datetime', ''),info.get('version', ''), desc])
+    if removed:
+        for bid in removed:
+            backups.pop(bid, None)
+        edit_instance(instance_name, backups=backups)
+
+    table.print_closing()
+
+
+class Table:
+    def __init__(self, title: str, columns_data: list):
+        self.title = title
+        self.columns_data = columns_data
+        self._total_width = self._calculate_total_width()
+
+    def _calculate_total_width(self) -> int:
+        if not self.columns_data:
+            return 0
+
+        total_columns_width = sum(width for _, width in self.columns_data)
+
+        num_spaces = len(self.columns_data) - 1
+
+        return total_columns_width + num_spaces
+
+    def print_header(self):
+        print("\n" + self.title.center(self._total_width) + "\n")
+
+        header_parts = []
+        separator_parts = []
+        for name, width in self.columns_data:
+            header_parts.append(f"{name:<{width}}")
+            separator_parts.append(f"{'-' * width:<{width}}")
+
+        print(" ".join(header_parts))
+        print(" ".join(separator_parts))
+
+    def print_row(self, row_values: list):
+        if len(row_values) != len(self.columns_data):
+            print(
+                f"Error: Row values count ({len(row_values)}) does not match column count ({len(self.columns_data)}).")
+            return
+
+        content_parts = []
+        for i, (col_name, width) in enumerate(self.columns_data):
+            value = str(row_values[i])  # Ensure value is a string
+            content_parts.append(f"{value:<{width}}")
+
+        print(" ".join(content_parts))
+
+    def print_closing(self):
+        separator_parts = []
+        for _, width in self.columns_data:
+            separator_parts.append(f"{'-' * width:<{width}}")
+        print(" ".join(separator_parts))
 
 
 def list_instances():
@@ -877,15 +931,25 @@ def list_instances():
                     print(f"Warning: An error occurred while processing instance '{instance_dir.name}': {e}. Skipping.")
 
     if found_instances:
-        print("\n--- Available Minecraft Server Instances ---")
-        print(f"{'Name':<20} {'Loader':<15} {'Version':<15} {'Memory':<10}")
-        print(f"{'-'*20:<20} {'-'*15:<15} {'-'*15:<15} {'-'*10:<10}")
+        title = "--- Available Minecraft Server Instances ---"
+        columns =[('Name', 20),('Loader', 15),('Version', 20),('Memory', 10)]
+        table = Table(title, columns)
+
+        table.print_header()
         for instance in found_instances:
-            print(f"{instance['name']:<20} {instance['instance']['version']['loader']['type']:<15}  {instance['instance']['version']['minecraft']:<15} {instance['instance']['memory']:<10}")
-        print("-"*63)
+            table.print_row([instance['name'], instance['instance']['version']['loader']['type'],get_version_name_download(instance['instance']['version']['minecraft']), instance['instance']['memory']])
+        table.print_closing()
     else:
         print("No Minecraft server instances found.")
     return found_instances
+
+def get_version_name_download(ver):
+    if ver in ('l', 'latest'):
+        return f"latest version"
+    elif ver in ('s', 'snapshot'):
+        return f"latest snapshot"
+    else:
+        return ver
 
 def edit_global_config(key=None, value=None):
     current_config = read_config()
