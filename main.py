@@ -730,6 +730,16 @@ def attach_resourcepack(instance_name: str, resourcepack_value: str, resourcepac
     print("Resource pack information attached to '" + instance_name + "' successfully.")
     return True
 
+def get_version_name_download(ver):
+    manifest = get_versions()
+    if ver in ('l', 'latest'):
+        version = manifest.get('latest').get("release")
+        return f"latest version - {version}"
+    elif ver in ('s', 'snapshot'):
+        version = manifest.get('latest').get("snapshot")
+        return f"latest snapshot - {version}"
+    else:
+        return ver
 
 def launch_server(instance_name: str, no_gui=False):
     config = read_config()
@@ -770,7 +780,7 @@ def launch_server(instance_name: str, no_gui=False):
             current_sha1 = calculate_file_sha1(server_jar_path)
 
         if not server_jar_path.exists() or current_sha1 != server_sha:
-            print(f"server.jar not found or SHA1 mismatch. Downloading {instance.get('version')} server.jar...")
+            print(f"server.jar not found or SHA1 mismatch. Downloading server.jar for {get_version_name_download(instance.get('version').get('minecraft'))}...")
             download_server(server_jar_url, server_sha, server_jar_path)
         else:
             print("server.jar is up to date.")
