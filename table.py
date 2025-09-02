@@ -1,14 +1,6 @@
 import re
 import textwrap
 
-ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\].*?\x07|\].*?\x1b\\)')
-
-
-def strip_ansi(text: str) -> str:
-    return ANSI_ESCAPE.sub("", text)
-
-
-
 class Table:
     def __init__(self, title: str, columns_data: list = None, width: int = 80):
         self.title = title

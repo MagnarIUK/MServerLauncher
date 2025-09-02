@@ -3,10 +3,7 @@ from typing import Optional
 from modrinth_api_wrapper import Client
 from table import Table
 
-def hyperlink(text: str, url: str) -> str:
-    return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
-
-def main(command: list,instance: Optional[str] = None):
+def main(command: list, instance: Optional[str] = None):
     client = Client()
     if len(command) == 0:
         print("No commands given.")

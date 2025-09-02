@@ -2,7 +2,7 @@ import hashlib
 import random
 import string
 import sys
-import psutil, signal
+import psutil
 import shutil
 from datetime import datetime, timedelta, timezone
 import http.server
