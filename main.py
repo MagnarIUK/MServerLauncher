@@ -14,9 +14,10 @@ import json
 import argparse
 import zipfile
 from pathlib import Path
-from tokenize import String
-
+from table import Table
+from modrinth_api_wrapper import Client
 import requests
+import modrinth_cli
 
 EMPTY_CONFIG = {
     "instances_folder": str(Path.home().joinpath(".minecraft/server_instances").absolute()),
@@ -49,13 +50,22 @@ EMPTY_INSTANCE_CFG = {
     "resourcepack": "",
     "resourcepack_port": 2548,
     "backups": {
-    }
+    },
+    "modrinth": {}
 }
 EMPTY_BACKUP_CFG = {
     "version": "",
     "datetime": "",
     "desc": ""
 }
+EMPTY_MODRINTH_CFG = {
+    "type": "",
+    "name": "",
+    "project_id": "",
+    "verions_id": ""
+}
+
+mClient = Client()
 
 rp_httpd = None
 rp_server_thread = None
@@ -861,54 +871,6 @@ def list_backups(instance_name: str):
     table.print_closing()
 
 
-class Table:
-    def __init__(self, title: str, columns_data: list):
-        self.title = title
-        self.columns_data = columns_data
-        self._total_width = self._calculate_total_width()
-
-    def _calculate_total_width(self) -> int:
-        if not self.columns_data:
-            return 0
-
-        total_columns_width = sum(width for _, width in self.columns_data)
-
-        num_spaces = len(self.columns_data) - 1
-
-        return total_columns_width + num_spaces
-
-    def print_header(self):
-        print("\n" + self.title.center(self._total_width) + "\n")
-
-        header_parts = []
-        separator_parts = []
-        for name, width in self.columns_data:
-            header_parts.append(f"{name:<{width}}")
-            separator_parts.append(f"{'-' * width:<{width}}")
-
-        print(" ".join(header_parts))
-        print(" ".join(separator_parts))
-
-    def print_row(self, row_values: list):
-        if len(row_values) != len(self.columns_data):
-            print(
-                f"Error: Row values count ({len(row_values)}) does not match column count ({len(self.columns_data)}).")
-            return
-
-        content_parts = []
-        for i, (col_name, width) in enumerate(self.columns_data):
-            value = str(row_values[i])  # Ensure value is a string
-            content_parts.append(f"{value:<{width}}")
-
-        print(" ".join(content_parts))
-
-    def print_closing(self):
-        separator_parts = []
-        for _, width in self.columns_data:
-            separator_parts.append(f"{'-' * width:<{width}}")
-        print(" ".join(separator_parts))
-
-
 def list_instances():
     config = read_config()
     instances_path = Path(config['instances_folder'])
@@ -1044,11 +1006,20 @@ def main():
     parser.add_argument("-gui", "--gui",action="store_true",
                         help="Reverses default option.")
     parser.add_argument("-c", "--command", required=True,
-                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config", "edit-sp", "rollback"],
-                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config', 'edit-sp', 'rollback.")
+                        choices=["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "list", "edit-config", "edit-sp", "rollback", "modrinth"],
+                        help="Command to execute: 'create', 'launch', 'check', 'edit', 'backup', 'delete', 'open', 'attach', 'list', 'edit-config', 'edit-sp', 'rollback', 'modrinth'.")
 
 
-    args = parser.parse_args()
+    args, extra_args = parser.parse_known_args()
+
+    if args.command == "modrinth":
+        if not args.instance:
+            modrinth_cli.main(extra_args)
+        else:
+            if check_instance(args.instance):
+                modrinth_cli.main(extra_args, args.instance)
+            else:
+                print("Instance does not exist.")
 
     instance_commands = ["create", "launch", "check", "edit", "backup", "delete", "open", "attach", "edit-sp", "rollback"]
     if args.command in instance_commands and not args.instance:
@@ -1182,8 +1153,6 @@ def main():
             update_server_properties(args.instance, args.key, args.value)
         else:
             print(f"Error: Instance '{args.instance}' does not exist.")
-
-
 
 if __name__ == "__main__":
     try:
