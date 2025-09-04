@@ -14,9 +14,10 @@ import json
 import argparse
 import zipfile
 from pathlib import Path
+import requests
+
 from table import Table
 from modrinth_api_wrapper import Client
-import requests
 import modrinth_cli
 
 EMPTY_CONFIG = {
@@ -1044,7 +1045,8 @@ def main():
         loader = args.loader if args.loader else "vanilla"
         loader_ver = args.loader_version if args.loader_version else "latest"
         resourcepack_path = args.resourcepack if args.resourcepack else ""
-        resourcepack_port_setting = args.resourcepack_port if args.resourcepack_port is not None else EMPTY_INSTANCE_CFG['resourcepack_port']
+        resourcepack_port_setting = args.resourcepack_port if args.resourcepack_port is not None \
+            else EMPTY_INSTANCE_CFG['resourcepack_port']
 
         try:
             create_instance(args.instance, version_to_use, memory_to_use, auto_backup_setting,
