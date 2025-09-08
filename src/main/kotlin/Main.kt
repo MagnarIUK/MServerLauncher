@@ -60,7 +60,7 @@ abstract class OptionalInstanceCommand(
     val helpText: String
 ) : CliktCommand(name = name) {
     override fun help(context: Context) = helpText.trimIndent()
-    val instance by argument("instance", help = "Name of the instance").optional()
+    val instance by argument("instance", help = "(OPTIONAL) Name of the instance").optional()
     fun withOptionalInstance(
         onInstance: (inst: String) -> Unit,
         onNoInstance: () -> Unit = {}
@@ -83,13 +83,13 @@ abstract class Command(
     override fun help(context: Context): String = helpString
 }
 
-class CheckInstanceCommand : InstanceCommand("check", "This command checks if instance exists.") {
+class CheckInstanceCommand : InstanceCommand("check", "Checks if instance exists.") {
     override fun run() {
         echo("Instance '$validatedInstance' exists.")
     }
 }
 
-class CreateInstanceCommand : InstanceCommand("create", "This command creates a new instance.") {
+class CreateInstanceCommand : InstanceCommand("create", "Creates a new instance.") {
     val def = INSTANCE_CONFIG()
     val version by option("-ver", "--version", help="Instance Version").default(def.version.minecraft, defaultForHelp = def.version.minecraft)
     val memory by option("-mem", "--memory", help="Memory allocation for the server (e.g., 1024M, 2G). Default is 2048M.").default(def.memory, defaultForHelp = def.memory)
@@ -117,7 +117,7 @@ class CreateInstanceCommand : InstanceCommand("create", "This command creates a 
 
 }
 
-class EditInstanceCommand : InstanceCommand("edit", "This command edits an existing instance.") {
+class EditInstanceCommand : InstanceCommand("edit", "Edits an existing instance.") {
     val version by option("-ver", "--version", help="Instance Version")
     val memory by option("-mem", "--memory", help="Memory allocation for the server (e.g., 1024M, 2G).")
     val loader by option("-load", "--loader", help="Instance loader.")
@@ -143,7 +143,7 @@ class EditInstanceCommand : InstanceCommand("edit", "This command edits an exist
     }
 }
 
-class ListCommand : OptionalInstanceCommand("list", "This command lists all instances, or backup in instance if instance is specified.") {
+class ListCommand : OptionalInstanceCommand("list", "Lists all instances, or backup in instance if instance is specified.") {
     override fun run() {
         withOptionalInstance(
             onInstance = { instance ->
@@ -154,7 +154,7 @@ class ListCommand : OptionalInstanceCommand("list", "This command lists all inst
     }
 }
 
-class LaunchCommand : InstanceCommand("launch", "This command launches an existing instance.") {
+class LaunchCommand : InstanceCommand("launch", "Launches an existing instance.") {
     val gui by option("-gui", "--gui",
         help="If used, server will launch with GUI").flag()
 
@@ -165,31 +165,31 @@ class LaunchCommand : InstanceCommand("launch", "This command launches an existi
     }
 }
 
-class BackupInstanceCommand : InstanceCommand("backup", "This command backups an existing instance.") {
+class BackupInstanceCommand : InstanceCommand("backup", "Backups an existing instance.") {
     val backup by argument("backup", "Optional backup description.").default("")
     override fun run() {
         backupInstance(validatedInstance, backup)
     }
 }
 
-class RollbackInstanceCommand : InstanceCommand("rollback", "This command restores backup of an existing instance.") {
+class RollbackInstanceCommand : InstanceCommand("rollback", "Restores backup of an existing instance.") {
     val backup by argument("backup", "Id of a backup you want to restore \n(use 'list <instance>' to check backups)")
     override fun run() {
         rollbackInstance(validatedInstance, backup)
     }
 }
 
-class DeleteInstanceCommand : InstanceCommand("delete", "This command deletes an existing instance.") {
+class DeleteInstanceCommand : InstanceCommand("delete", "Deletes an existing instance.") {
     override fun run() {
         deleteInstance(validatedInstance)
     }
 }
-class OpenInstanceFolderCommand : InstanceCommand("open", "This command opens folder with an existing instance.") {
+class OpenInstanceFolderCommand : InstanceCommand("open", "Opens folder with an existing instance.") {
     override fun run() {
         openInstanceFolder(validatedInstance)
     }
 }
-class AttachResourcepackCommand : InstanceCommand("attach", "This command attaches an existing instance.") {
+class AttachResourcepackCommand : InstanceCommand("attach", "Attaches an resourcepack to existing instance.") {
     val resourcepack by argument("resource pack", "Path or link to the resource pack .zip file to attach")
     val resourcepackPort by option("-rpp", "--resourcepack-port", help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.").int()
     val upload by option("-u","--upload", help="Upload the file to upload server.").flag()
@@ -211,9 +211,9 @@ class AttachResourcepackCommand : InstanceCommand("attach", "This command attach
 }
 
 class EditConfigCommand : Command("config",
-    "This command edits global config.\n\n" +
+    "Edits global config.\n\n" +
             "If <key value> is omitted, the config file will open in your default editor") {
-    val map: Pair<String, String>? by argument("key value" ,help="Key and value for editing config.").pair().optional()
+    val map: Pair<String, String>? by argument("key value" ,help="(OPTIONAL) Key and value for editing config.").pair().optional()
     override fun run() {
         map?.let {
             editGlobalConfig(it.first, it.second)
@@ -225,7 +225,7 @@ class EditConfigCommand : Command("config",
 
 class EditServerPropertiesCommand : InstanceCommand("sp",
     "Edits server properties of an instance.\n\nIf <key value> is omitted, the server.properties file will open in your default editor") {
-    val map: Pair<String, String>? by argument("key value", "Key and value for editing config.").pair().optional()
+    val map: Pair<String, String>? by argument("key value", "(OPTIONAL) Key and value for editing config.").pair().optional()
     override fun run() {
         val file = Path.of(readConfig().instancesFolder, validatedInstance, "server.properties")
         map?.let {
@@ -260,5 +260,5 @@ class MS : CliktCommand() {
     }
 }
 
-//fun main(args: Array<String>) = MS().main(args)
-fun main() = MS().main(readln().split(" "))
+fun main(args: Array<String>) = MS().main(args)
+//fun main() = MS().main(readln().split(" "))
