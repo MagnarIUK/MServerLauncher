@@ -50,6 +50,11 @@ fun createInstance(
     cfgFile.writeText(Json { prettyPrint = true }.encodeToString(instanceCfg))
 
     val eulaFile = instancePath.resolve("eula.txt").toFile()
+    val spFile = instancePath.resolve("server.properties").toFile()
+    if (!spFile.exists()) {
+        spFile.createNewFile()
+    }
+
     if (!eulaFile.exists()) {
         eulaFile.writeText("eula=true\n")
     } else {

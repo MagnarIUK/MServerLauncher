@@ -32,10 +32,6 @@ fun editInstance(
     instanceCfg = instanceCfg.copy(
         memory = memory ?: instanceCfg.memory,
         autoBackup = autoBackup ?: instanceCfg.autoBackup,
-        resourcepack = resourcepack?.let {
-            if (it.startsWith("http://") || it.startsWith("https://")) it else Path.of(it).toAbsolutePath().toString()
-        } ?: instanceCfg.resourcepack,
-        resourcepackPort = resourcepackPort ?: instanceCfg.resourcepackPort,
         backups = backups ?: instanceCfg.backups,
         version = instanceCfg.version.copy(
             minecraft = version ?: instanceCfg.version.minecraft,
@@ -45,6 +41,10 @@ fun editInstance(
             )
         )
     )
+
+    resourcepack?.let {
+        attachResourcePack(name, resourcepack, resourcepackPort)
+    }
 
     Files.createDirectories(instancePath)
     cfgFile.writeText(Json { prettyPrint = true }.encodeToString(instanceCfg))

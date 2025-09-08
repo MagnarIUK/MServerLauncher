@@ -14,7 +14,5 @@ data class CONFIG(
     @SerialName("api_password") val apiPassword: String = "",
     @SerialName("backup_on_rollback") val backupOnRollback: Boolean = true,
     @SerialName("launched") val launched: List<LAUNCHED_CONFIG> = emptyList(),
-
-
-
+    @SerialName("default_editor") val defaultEditor: String = "",
     )

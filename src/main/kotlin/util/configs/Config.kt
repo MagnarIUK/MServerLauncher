@@ -1,15 +1,13 @@
 package com.magnariuk.util.configs
 
+import com.magnariuk.configPath
 import com.magnariuk.data.configs.CONFIG
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
-import java.nio.file.Path
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
-private val configPath: Path = Path.of(System.getProperty("user.home"))
-    .resolve(".minecraft/server_instances/config.json")
-private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true }
 
 fun writeConfig(cfg: CONFIG) {
     Files.createDirectories(configPath.parent)
@@ -17,25 +15,37 @@ fun writeConfig(cfg: CONFIG) {
 }
 
 fun readConfig(): CONFIG {
+    val defaults = CONFIG()
+
     if (Files.exists(configPath)) {
         val content = configPath.readText()
-        return try {
-            val loaded = json.decodeFromString<CONFIG>(content)
-            mergeWithDefaults(loaded)
+        val loaded = try {
+            json.decodeFromString<CONFIG>(content)
         } catch (e: Exception) {
             println("Error reading config: ${e.message}, falling back to defaults.")
-            CONFIG()
+            defaults
         }
+
+        val merged = mergeWithDefaults(loaded)
+
+        writeConfig(merged)
+
+        return merged
+    } else {
+        writeConfig(defaults)
+        return defaults
     }
-    return CONFIG().also { writeConfig(it) }
 }
+
 private fun mergeWithDefaults(cfg: CONFIG): CONFIG {
+    val defaults = CONFIG()
     return CONFIG(
-        instancesFolder = cfg.instancesFolder.ifBlank { CONFIG().instancesFolder },
-        api = cfg.api,
-        apiLogin = cfg.apiLogin,
-        apiPassword = cfg.apiPassword,
+        instancesFolder = cfg.instancesFolder.ifBlank { defaults.instancesFolder },
+        api = cfg.api.ifBlank { defaults.api },
+        apiLogin = cfg.apiLogin.ifBlank { defaults.apiLogin },
+        apiPassword = cfg.apiPassword.ifBlank { defaults.apiPassword },
         backupOnRollback = cfg.backupOnRollback,
-        launched = cfg.launched
+        launched = cfg.launched.ifEmpty { defaults.launched },
+        defaultEditor = cfg.defaultEditor.ifBlank { defaults.defaultEditor }
     )
 }

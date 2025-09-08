@@ -28,6 +28,13 @@ fun updateServerProperties(instanceName: String, key: String, value: String): Bo
         return false
     }
 
+    if (key == "resource-pack"){
+
+        println("Resource pack was set in instance config. " +
+            "In the future, use 'attach -rp' to add resource pack to the instance")
+        return true
+    }
+
     val newLines = lines.map { line ->
         val stripped = line.trim()
         if (stripped.startsWith("$key=") && !stripped.startsWith("#")) {

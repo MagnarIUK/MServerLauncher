@@ -6,14 +6,17 @@ import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.parameters.options.associate
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.default
+import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.arguments.pair
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.magnariuk.data.configs.INSTANCE_CONFIG
 import com.magnariuk.util.configs.editGlobalConfig
+import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.attachResourcePack
 import com.magnariuk.util.instance.backupInstance
 import com.magnariuk.util.instance.checkInstance
@@ -26,6 +29,7 @@ import com.magnariuk.util.instance.listInstances
 import com.magnariuk.util.instance.openInstanceFolder
 import com.magnariuk.util.instance.rollbackInstance
 import com.magnariuk.util.instance.updateServerProperties
+import com.magnariuk.util.openInDefaultEditor
 import com.magnariuk.util.uploadFile
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
@@ -37,7 +41,7 @@ abstract class InstanceCommand(
     val helpText: String
 ) : CliktCommand(name = name) {
     override fun help(context: Context) = helpText.trimIndent()
-    val instance by option("-i", "--instance", help = "Name of the instance").required()
+    val instance by argument("instance", help = "Name of the instance")
     val validatedInstance: String by lazy {
         if (!checkInstance(instance)) {
             throw CliktError("Instance '$instance' does not exist")
@@ -56,7 +60,7 @@ abstract class OptionalInstanceCommand(
     val helpText: String
 ) : CliktCommand(name = name) {
     override fun help(context: Context) = helpText.trimIndent()
-    val instance by option("-i", "--instance", help = "Name of the instance")
+    val instance by argument("instance", help = "Name of the instance").optional()
     fun withOptionalInstance(
         onInstance: (inst: String) -> Unit,
         onNoInstance: () -> Unit = {}
@@ -69,6 +73,14 @@ abstract class OptionalInstanceCommand(
             }
         } ?: onNoInstance()
     }
+}
+
+
+abstract class Command(
+    val name: String,
+    val helpString: String
+) : CliktCommand(name = name) {
+    override fun help(context: Context): String = helpString
 }
 
 class CheckInstanceCommand : InstanceCommand("check", "This command checks if instance exists.") {
@@ -154,16 +166,14 @@ class LaunchCommand : InstanceCommand("launch", "This command launches an existi
 }
 
 class BackupInstanceCommand : InstanceCommand("backup", "This command backups an existing instance.") {
-    val backup by option("-b", "--backup",
-        help="Optional backup description.").default("")
+    val backup by argument("backup", "Optional backup description.").default("")
     override fun run() {
         backupInstance(validatedInstance, backup)
     }
 }
 
 class RollbackInstanceCommand : InstanceCommand("rollback", "This command restores backup of an existing instance.") {
-    val backup by option("-b", "--backup",
-        help="Id of a backup you want to restore").required()
+    val backup by argument("backup", "Id of a backup you want to restore \n(use 'list <instance>' to check backups)")
     override fun run() {
         rollbackInstance(validatedInstance, backup)
     }
@@ -180,8 +190,7 @@ class OpenInstanceFolderCommand : InstanceCommand("open", "This command opens fo
     }
 }
 class AttachResourcepackCommand : InstanceCommand("attach", "This command attaches an existing instance.") {
-    val resourcepack by option("-rp", "--resourcepack",
-        help="Path or link to the resource pack .zip file to attach.").required()
+    val resourcepack by argument("resource pack", "Path or link to the resource pack .zip file to attach")
     val resourcepackPort by option("-rpp", "--resourcepack-port", help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.").int()
     val upload by option("-u","--upload", help="Upload the file to upload server.").flag()
 
@@ -201,25 +210,28 @@ class AttachResourcepackCommand : InstanceCommand("attach", "This command attach
     }
 }
 
-class EditConfigCommand : CliktCommand("edit-config") {
-    override fun help(context: Context): String = "This command edits global config."
-    val map: Map<String, String> by option("-m", "--map",
-        help="Key and value (map) for editing config.").associate()
-
+class EditConfigCommand : Command("config",
+    "This command edits global config.\n\n" +
+            "If <key value> is omitted, the config file will open in your default editor") {
+    val map: Pair<String, String>? by argument("key value" ,help="Key and value for editing config.").pair().optional()
     override fun run() {
-        for (item in map) {
-            editGlobalConfig(item.key, item.value)
+        map?.let {
+            editGlobalConfig(it.first, it.second)
+        } ?: run {
+            openInDefaultEditor(configPath.toFile())
         }
     }
 }
 
-class EditServerPropertiesCommand : InstanceCommand("edit-sp", "Edits server properties of an instance.") {
-    val map: Map<String, String> by option("-m", "--map",
-        help="Key and value (map) for editing config.").associate()
-
+class EditServerPropertiesCommand : InstanceCommand("sp",
+    "Edits server properties of an instance.\n\nIf <key value> is omitted, the server.properties file will open in your default editor") {
+    val map: Pair<String, String>? by argument("key value", "Key and value for editing config.").pair().optional()
     override fun run() {
-        for (item in map) {
-            updateServerProperties(validatedInstance, item.key, item.value)
+        val file = Path.of(readConfig().instancesFolder, validatedInstance, "server.properties")
+        map?.let {
+            updateServerProperties(validatedInstance, it.first, it.second)
+        } ?: run {
+            openInDefaultEditor(file.toFile(), "server.properties file does not exist for $validatedInstance, launch this instance at least once.")
         }
     }
 }
@@ -231,7 +243,6 @@ class ModrinthCommand : OptionalInstanceCommand("modrinth", "Not yet implemented
 }
 class MS : CliktCommand() {
     override fun run() {
-        echo("Use --help to see available commands")
     }
 
     init {
@@ -249,4 +260,5 @@ class MS : CliktCommand() {
     }
 }
 
-fun main(args: Array<String>) = MS().main(args)
+//fun main(args: Array<String>) = MS().main(args)
+fun main() = MS().main(readln().split(" "))
