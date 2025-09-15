@@ -7,7 +7,9 @@ import java.io.File
 interface Network {
     suspend fun get(
         url: String,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
+        params: Map<String, Any?> = emptyMap(),
+        body: Any? = null
     ): HttpResponse
     suspend fun post(
         url: String,

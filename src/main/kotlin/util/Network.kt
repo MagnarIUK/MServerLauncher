@@ -7,6 +7,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -15,6 +16,7 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.contentLength
 import io.ktor.http.contentType
+import io.ktor.http.headers
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
@@ -33,12 +35,20 @@ class Network(
 ): Network {
     override suspend fun get(
         url: String,
-        headers: Map<String, String>
+        headers: Map<String, String>,
+        params: Map<String, Any?>,
+        body: Any?
     ): HttpResponse {
-        return client.get(url){
-            headers.forEach { (k,v) -> header(k,v) }
+        return client.get(url) {
+            headers.forEach { (k, v) -> header(k, v) }
+            params.forEach { (k, v) -> parameter(k, v) }
+            if (body != null) {
+                setBody(body)
+            }
         }
     }
+
+
 
     override suspend fun post(
         url: String,
