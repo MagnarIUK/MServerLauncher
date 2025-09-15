@@ -4,7 +4,7 @@ import com.magnariuk.util.Table
 import com.magnariuk.util.configs.readConfig
 import java.nio.file.Path
 
-fun listBackups(instanceName: String) {
+fun listBackups(instanceName: String, printHeader: Boolean = true) {
     val instanceCfg = getInstance(instanceName)
     if (instanceCfg == null) {
         println("Instance '$instanceName' not found.")
@@ -23,8 +23,7 @@ fun listBackups(instanceName: String) {
     val title = "--- Backups for $instanceName ---"
     val columns = listOf("ID" to 10, "Date/Time" to 20, "Version" to 10, "Description" to 40)
     val table = Table(title, columns)
-
-    table.printHeader()
+    if (printHeader) table.printHeader()
 
     val removed = mutableListOf<String>()
 

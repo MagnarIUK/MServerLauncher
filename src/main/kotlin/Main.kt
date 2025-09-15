@@ -27,6 +27,7 @@ import com.magnariuk.util.instance.launchServer
 import com.magnariuk.util.instance.listBackups
 import com.magnariuk.util.instance.listInstances
 import com.magnariuk.util.instance.openInstanceFolder
+import com.magnariuk.util.instance.outputInstance
 import com.magnariuk.util.instance.rollbackInstance
 import com.magnariuk.util.instance.updateServerProperties
 import com.magnariuk.util.openInDefaultEditor
@@ -85,7 +86,7 @@ abstract class Command(
 
 class CheckInstanceCommand : InstanceCommand("check", "Checks if instance exists.") {
     override fun run() {
-        echo("Instance '$validatedInstance' exists.")
+        outputInstance(validatedInstance)
     }
 }
 
