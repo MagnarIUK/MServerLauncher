@@ -243,8 +243,7 @@ class ModrinthCommand : OptionalInstanceCommand("modrinth", "Not yet implemented
     }
 }
 class MS : CliktCommand() {
-    override fun run() {
-    }
+    override fun run() {}
 
     init {
         completionOption()

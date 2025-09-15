@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.magnariuk"
-version = "1.4.1"
+version = "1.4.1.1"
 
 repositories {
     mavenCentral()
@@ -53,6 +53,21 @@ tasks.register<Jar>("fatJar") {
     }
 
     from(sourceSets.main.get().output)
+
+    doLast {
+        val outputDir = layout.buildDirectory.dir("distributions/${project.version}").get().asFile
+        outputDir.mkdirs()
+        val jarFile = archiveFile.get().asFile
+        jarFile.copyTo(File(outputDir, jarFile.name), overwrite = true)
+        val scriptFile = File(outputDir, "ms")
+        val scriptContent = """
+            #!/bin/bash
+            SCRIPT_DIR=$(dirname "$0")
+            java --enable-native-access=ALL-UNNAMED -jar "${'$'}SCRIPT_DIR/${jarFile.name}" "$@"
+        """.trimIndent()
+        scriptFile.writeText(scriptContent)
+        scriptFile.setExecutable(true)
+    }
 
     dependsOn(configurations.runtimeClasspath)
     from({
