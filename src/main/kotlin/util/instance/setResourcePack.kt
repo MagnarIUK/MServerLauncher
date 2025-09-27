@@ -14,9 +14,9 @@ suspend fun setResourcePack(instanceName: String, network: Network = Network()):
 
     if (rpValue.isEmpty()) {
         println("No resource pack specified for this instance. Disabling resource pack settings in server.properties.")
-        updateServerProperties(instanceName, "require-resource-pack", "false")
-        updateServerProperties(instanceName, "resource-pack", "")
-        updateServerProperties(instanceName, "resource-pack-sha1", "")
+        updateServerProperties(instanceName, "require-resource-pack", "false", internal = true)
+        updateServerProperties(instanceName, "resource-pack", "",internal = true)
+        updateServerProperties(instanceName, "resource-pack-sha1", "",internal = true)
         return true
     }
 
@@ -60,8 +60,8 @@ suspend fun setResourcePack(instanceName: String, network: Network = Network()):
         }
     }
 
-    updateServerProperties(instanceName, "resource-pack", rpUrl)
-    updateServerProperties(instanceName, "resource-pack-sha1", rpSha1)
+    updateServerProperties(instanceName, "resource-pack", rpUrl,internal = true)
+    updateServerProperties(instanceName, "resource-pack-sha1", rpSha1,internal = true)
 
     println("Resource pack configuration for '$instanceName' updated in server.properties.")
     return true

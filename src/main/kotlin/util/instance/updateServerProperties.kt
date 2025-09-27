@@ -3,7 +3,7 @@ package com.magnariuk.util.instance
 import com.magnariuk.util.configs.readConfig
 import java.nio.file.Path
 
-fun updateServerProperties(instanceName: String, key: String, value: String): Boolean {
+fun updateServerProperties(instanceName: String, key: String, value: String, internal: Boolean = false): Boolean {
     val instancesFolder = readConfig().instancesFolder
     val serverPropertiesPath = Path.of(instancesFolder, instanceName, "server.properties").toFile()
 
@@ -28,8 +28,7 @@ fun updateServerProperties(instanceName: String, key: String, value: String): Bo
         return false
     }
 
-    if (key == "resource-pack"){
-
+    if (key == "resource-pack" && !internal) {
         println("Resource pack was set in instance config. " +
             "In the future, use 'attach -rp' to add resource pack to the instance")
         return true

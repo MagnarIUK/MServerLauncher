@@ -17,7 +17,8 @@ fun editInstance(
     resourcepackPort: Int? = null,
     backups: Map<String, Backup>? = null,
     loaderType: String? = null,
-    loaderVersion: String? = null
+    loaderVersion: String? = null,
+    isInternal: Boolean = false,
 ) {
     val config = readConfig()
     val instancePath = Path.of(config.instancesFolder, name)
@@ -39,11 +40,15 @@ fun editInstance(
                 type = loaderType ?: instanceCfg.version.loader.type,
                 version = loaderVersion ?: instanceCfg.version.loader.version
             )
-        )
+        ),
+        resourcepackPort = resourcepackPort ?: instanceCfg.resourcepackPort,
     )
 
     resourcepack?.let {
-        attachResourcePack(name, resourcepack, resourcepackPort)
+        if (!isInternal) println("Use attach command to add resourcepack.")
+        else{
+            instanceCfg.resourcepack = resourcepack
+        }
     }
 
     Files.createDirectories(instancePath)

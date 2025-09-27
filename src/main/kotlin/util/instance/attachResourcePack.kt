@@ -27,7 +27,8 @@ fun attachResourcePack(
     editInstance(
         name = instanceName,
         resourcepack = rpValue,
-        resourcepackPort = resourcePackPort ?: instanceCfg.resourcepackPort
+        resourcepackPort = resourcePackPort,
+        isInternal = true
     )
 
     println("Resource pack information attached to '$instanceName' successfully.")

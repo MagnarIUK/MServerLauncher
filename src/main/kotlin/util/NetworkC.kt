@@ -4,6 +4,8 @@ import com.magnariuk.util.interfaces.Download
 import com.magnariuk.util.interfaces.Network
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
+import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -24,12 +26,16 @@ import okio.buffer
 import okio.sink
 import java.io.File
 
-class Network(
+class NetworkC(
     val bufferSize: Long = DEFAULT_BUFFER_SIZE.toLong(),
     private val client: HttpClient = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
+        install(HttpCookies) {
+            storage = AcceptAllCookiesStorage()
+        }
+
     }
 ): Network {
     override suspend fun get(

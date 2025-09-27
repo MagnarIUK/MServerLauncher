@@ -10,8 +10,8 @@ data class INSTANCE_CONFIG(
     @SerialName("name") val name: String = "",
     @SerialName("memory") val memory: String = "2048M",
     @SerialName("auto_backup") val autoBackup: Boolean = false,
-    @SerialName("resourcepack") val resourcepack: String = "",
-    @SerialName("resourcepack_port") val resourcepackPort: Int = 2548,
+    @SerialName("resourcepack") var resourcepack: String = "",
+    @SerialName("resourcepack_port") var resourcepackPort: Int = 2548,
     @SerialName("backups") val backups: Map<String, Backup> = emptyMap(),
     @SerialName("modrinth") val modrinth: Map<String, String> = emptyMap(),
 )

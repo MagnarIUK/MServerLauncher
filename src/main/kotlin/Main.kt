@@ -15,6 +15,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.magnariuk.data.configs.INSTANCE_CONFIG
+import com.magnariuk.util.Table
 import com.magnariuk.util.configs.editGlobalConfig
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.attachResourcePack
@@ -199,7 +200,7 @@ class AttachResourcepackCommand : InstanceCommand("attach", "Attaches an resourc
     override fun run() {
         if(upload) {
             try{
-                val link =runBlocking { uploadFile(Path.of(resourcepack))!! }
+                val link = runBlocking { uploadFile(Path.of(resourcepack))!! }
                 attachResourcePack(instance, link, resourcepackPort)
             }catch(e: Exception){
                 echo("Failed to upload resourcepack '${resourcepack}': ${e}. Trying to attach file.", err=true)
@@ -254,11 +255,12 @@ class MS : CliktCommand() {
             BackupInstanceCommand(), RollbackInstanceCommand(),
             DeleteInstanceCommand(), OpenInstanceFolderCommand(),
             AttachResourcepackCommand(), EditConfigCommand(),
-            EditServerPropertiesCommand(), ModrinthCommand()
+            EditServerPropertiesCommand(), ModrinthCommand(),
+
 
         )
     }
 }
 
 fun main(args: Array<String>) = MS().main(args)
-//fun main() = MS().main(readln().split(" "))
+//fun main() = MS().main(readln().split("attach Escape \"/home/magnar/Downloads/Minecraft/escape/escape-rp.zip\" -u\n"))
