@@ -170,7 +170,7 @@ class LaunchCommand : InstanceCommand("launch", "Launches an existing instance."
 
     override fun run() {
         runBlocking {
-            launchServer(validatedInstance,gui)
+            launchServer(validatedInstance, gui)
         }
     }
 }
@@ -193,7 +193,7 @@ class BackupInstanceCommand : InstanceCommand("backup", "Backups an existing ins
     }
 }
 class RemoveBackupCommand(val instanceProvider: () -> String) : Command("remove", "Removes backup of an existing instance.") {
-    val backupIds by argument("ids", "IDs of a backups you want to restore \n(use 'list <instance>' to check backups)").multiple().optional()
+    val backupIds by argument("ids", "IDs of a backups you want to restore \n(use 'list <instance>' to check backups)\nIf omitted, will delete all backups").multiple().optional()
     override fun run() {
         backupIds?.let {
             removeBackups(instanceProvider(), it)
@@ -283,7 +283,7 @@ class WorldResetCommand : InstanceCommand("reset", "Resets world in given instan
 
 class ModrinthCommand : OptionalInstanceCommand("modrinth", "Not yet implemented") {
     override fun run() {
-        echo("Not yet implemented")
+        TODO("Not yet implemented")
     }
 }
 class MS : CliktCommand() {
