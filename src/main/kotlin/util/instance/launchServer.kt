@@ -1,7 +1,6 @@
 package com.magnariuk.util.instance
 
 import com.magnariuk.data.configs.INSTANCE_CONFIG
-import com.magnariuk.util.ResourcePackServer
 import com.magnariuk.util.api.calculateFileSha1
 import com.magnariuk.util.api.calculateRemoteSha1
 import com.magnariuk.util.api.downloadServer
@@ -173,7 +172,5 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
             is java.io.FileNotFoundException -> println("Error: Java executable '$javaExec' not found.")
             else -> println("An unexpected error occurred during server launch: $e")
         }
-    } finally {
-        ResourcePackServer.stop()
     }
 }
