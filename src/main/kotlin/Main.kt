@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
+import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.arguments.pair
 import com.github.ajalt.clikt.parameters.options.default
@@ -15,22 +16,24 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.magnariuk.data.configs.INSTANCE_CONFIG
-import com.magnariuk.util.Table
 import com.magnariuk.util.configs.editGlobalConfig
 import com.magnariuk.util.configs.readConfig
-import com.magnariuk.util.instance.attachResourcePack
-import com.magnariuk.util.instance.backupInstance
+import com.magnariuk.util.instance.configsApi.attachResourcePack
+import com.magnariuk.util.instance.backupApi.backupInstance
 import com.magnariuk.util.instance.checkInstance
 import com.magnariuk.util.instance.createInstance
 import com.magnariuk.util.instance.deleteInstance
 import com.magnariuk.util.instance.editInstance
 import com.magnariuk.util.instance.launchServer
-import com.magnariuk.util.instance.listBackups
+import com.magnariuk.util.instance.backupApi.listBackups
+import com.magnariuk.util.instance.backupApi.removeAllBackups
+import com.magnariuk.util.instance.backupApi.removeBackups
 import com.magnariuk.util.instance.listInstances
 import com.magnariuk.util.instance.openInstanceFolder
 import com.magnariuk.util.instance.outputInstance
-import com.magnariuk.util.instance.rollbackInstance
-import com.magnariuk.util.instance.updateServerProperties
+import com.magnariuk.util.instance.backupApi.rollbackInstance
+import com.magnariuk.util.instance.configsApi.updateServerProperties
+import com.magnariuk.util.instance.worldApi.resetWorld
 import com.magnariuk.util.openInDefaultEditor
 import com.magnariuk.util.uploadFile
 import kotlinx.coroutines.runBlocking
@@ -68,6 +71,11 @@ abstract class OptionalInstanceCommand(
         onNoInstance: () -> Unit = {}
     ) {
         instance?.let { inst ->
+            if (inst.isEmpty()) {
+                onNoInstance()
+                return
+            }
+
             if (checkInstance(inst)) {
                 onInstance(inst)
             } else {
@@ -168,16 +176,35 @@ class LaunchCommand : InstanceCommand("launch", "Launches an existing instance."
 }
 
 class BackupInstanceCommand : InstanceCommand("backup", "Backups an existing instance.") {
-    val backup by argument("backup", "Optional backup description.").default("")
+    override val invokeWithoutSubcommand = true
+    val backupDesc by argument("desc", "Optional backup description.").default("")
+
+    init {
+        subcommands(
+            RollbackInstanceCommand {validatedInstance},
+            RemoveBackupCommand {validatedInstance},
+        )
+
+    }
     override fun run() {
-        backupInstance(validatedInstance, backup)
+        if(currentContext.invokedSubcommand == null) {
+            backupInstance(validatedInstance, backupDesc)
+        }
+    }
+}
+class RemoveBackupCommand(val instanceProvider: () -> String) : Command("remove", "Removes backup of an existing instance.") {
+    val backupIds by argument("ids", "IDs of a backups you want to restore \n(use 'list <instance>' to check backups)").multiple().optional()
+    override fun run() {
+        backupIds?.let {
+            removeBackups(instanceProvider(), it)
+        } ?: removeAllBackups(instanceProvider())
     }
 }
 
-class RollbackInstanceCommand : InstanceCommand("rollback", "Restores backup of an existing instance.") {
-    val backup by argument("backup", "Id of a backup you want to restore \n(use 'list <instance>' to check backups)")
+class RollbackInstanceCommand(val instanceProvider: () -> String) : Command("rollback", "Restores backup of an existing instance.") {
+    val backupId by argument("id", "Id of a backup you want to restore \n(use 'list <instance>' to check backups)")
     override fun run() {
-        rollbackInstance(validatedInstance, backup)
+        rollbackInstance(instanceProvider(), backupId)
     }
 }
 
@@ -238,6 +265,22 @@ class EditServerPropertiesCommand : InstanceCommand("sp",
     }
 }
 
+class WorldCommand : Command("world", "World control api (WIP)"){
+    init {
+        subcommands(
+            WorldResetCommand()
+        )
+    }
+
+    override fun run() {}
+
+}
+class WorldResetCommand : InstanceCommand("reset", "Resets world in given instance"){
+    override fun run() {
+        resetWorld(validatedInstance)
+    }
+}
+
 class ModrinthCommand : OptionalInstanceCommand("modrinth", "Not yet implemented") {
     override fun run() {
         echo("Not yet implemented")
@@ -252,15 +295,31 @@ class MS : CliktCommand() {
             CheckInstanceCommand(),
             CreateInstanceCommand(), EditInstanceCommand(),
             ListCommand(), LaunchCommand(),
-            BackupInstanceCommand(), RollbackInstanceCommand(),
+            BackupInstanceCommand(),
             DeleteInstanceCommand(), OpenInstanceFolderCommand(),
             AttachResourcepackCommand(), EditConfigCommand(),
             EditServerPropertiesCommand(), ModrinthCommand(),
-
-
+            WorldCommand(),
         )
     }
 }
 
+object Test{
+    fun main() {
+        val ms = MS()
+        while (true){
+            val input = readln()
+            if (input == "q") { break }
+            try {
+                ms.main(input.split(" "))
+            } catch(e: Exception){
+                println(e.message)
+            }
+
+        }
+    }
+}
+
+
 fun main(args: Array<String>) = MS().main(args)
-//fun main() = MS().main(readln().split("attach Escape \"/home/magnar/Downloads/Minecraft/escape/escape-rp.zip\" -u\n"))
+//fun main() = Test.main()

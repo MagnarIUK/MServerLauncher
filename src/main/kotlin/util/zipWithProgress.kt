@@ -6,7 +6,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.relativeTo
 
-fun zipWithProgress(sourcePath: Path, destinationPath: Path): Boolean {
+fun zipWithProgress(sourcePath: Path, destinationPath: Path, showFullProgress: Boolean = false): Boolean {
     val fileList = mutableListOf<Pair<Path, Path>>()
 
     Files.walk(sourcePath).use { paths ->
@@ -23,19 +23,16 @@ fun zipWithProgress(sourcePath: Path, destinationPath: Path): Boolean {
     }
 
     ZipOutputStream(Files.newOutputStream(destinationPath.resolveSibling("${destinationPath.fileName}.zip"))).use { zipOut ->
-        for ((i, pair) in fileList.withIndex()) {
+        val progressBar = ProgressBar(label = "Backing up", useMessages = showFullProgress)
+        progressBar.start(total)
+        for (pair in fileList) {
             val (fullPath, relPath) = pair
-            zipOut.putNextEntry(ZipEntry(relPath.toString().replace("\\", "/"))) // Ensure zip uses forward slashes
+            zipOut.putNextEntry(ZipEntry(relPath.toString().replace("\\", "/")))
             Files.newInputStream(fullPath).use { input ->
                 input.copyTo(zipOut)
             }
             zipOut.closeEntry()
-
-            val progress = ((i + 1) * 100) / total
-            val barLength = 30
-            val filledLength = (progress * barLength) / 100
-            val bar = "█".repeat(filledLength) + "-".repeat(barLength - filledLength)
-            print("\rBacking up: |$bar| $progress% (${i+1}/$total files)")
+            progressBar.step(message = "+ $fullPath")
         }
     }
 

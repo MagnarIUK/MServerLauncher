@@ -1,10 +1,11 @@
-package com.magnariuk.util.instance
+package com.magnariuk.util.instance.configsApi
 
 import com.magnariuk.util.Network
 import com.magnariuk.util.ResourcePackServer
 import com.magnariuk.util.api.calculateFileSha1
 import com.magnariuk.util.api.calculateRemoteSha1
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.instance.getInstance
 import java.nio.file.Path
 
 suspend fun setResourcePack(instanceName: String, network: Network = Network()): Boolean {

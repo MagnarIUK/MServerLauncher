@@ -8,10 +8,13 @@ import com.magnariuk.util.api.downloadServer
 import com.magnariuk.util.api.getFabric
 import com.magnariuk.util.api.getVersion
 import com.magnariuk.util.configs.*
+import com.magnariuk.util.instance.backupApi.backupInstance
+import com.magnariuk.util.instance.configsApi.setResourcePack
 import java.nio.file.Path
 import kotlin.concurrent.thread
+import kotlin.io.path.div
 
-suspend fun launchServer(instanceName: String, gui: Boolean = false) {
+suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmediately: Boolean = false) {
     val config = readConfig()
     val instance = getInstance(instanceName)
 
@@ -21,11 +24,11 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false) {
     }
 
     val instancePath = Path.of(config.instancesFolder, instanceName).toFile()
-    val serverJarPath = instancePath.resolve("server.jar")
 
+    val serverJarPath = (Path.of(config.instancesFolder) / ".versions")
     val javaExec = "java"
     try {
-        if (instance.autoBackup) {
+        if (instance.autoBackup && !exitImmediately) {
             println("Auto-backup enabled. Creating backup for '$instanceName' before launch...")
             if (!backupInstance(instanceName, "Auto-backup")) {
                 println("Auto-backup failed. Continuing with server launch anyway.")
@@ -67,20 +70,26 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false) {
             println("Server download information missing from version manifest.")
             return
         }
-
-        val currentSha = if (serverJarPath.exists()) {
+        var versionStr = ver.id
+        if (instance.version.loader.type == "fabric"){
+            versionStr = "fabric-${ver.id}.jar"
+        }
+        val serverJarFile = (serverJarPath / versionStr).toFile()
+        serverJarFile.parentFile.mkdirs()
+        val currentSha = if (serverJarFile.exists()) {
             println("Checking existing server.jar SHA1...")
-            calculateFileSha1(serverJarPath.absolutePath)
+            calculateFileSha1(serverJarFile.absolutePath)
         } else null
 
-        if (!serverJarPath.exists() || currentSha != serverSha) {
+        if (!serverJarFile.exists() || currentSha != serverSha) {
             println("server.jar not found or SHA1 mismatch. Downloading server.jar...")
-            downloadServer(serverJarUrl, serverSha, serverJarPath)
+            downloadServer(serverJarUrl, serverSha, serverJarFile)
         } else {
             println("server.jar is up to date.")
         }
 
-        setResourcePack(instanceName)
+
+        if(!exitImmediately) setResourcePack(instanceName)
 
 
         val memoryAllocation = instance.memory.ifEmpty { INSTANCE_CONFIG().memory }
@@ -90,7 +99,7 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false) {
             "-Xmx$memoryAllocation",
             "-Xms$memoryAllocation",
             "-jar",
-            serverJarPath.absolutePath
+            serverJarFile.absolutePath
         )
 
         val resPack = instance.resourcepack
@@ -99,17 +108,49 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false) {
 
 
 
-        println("Use GUI: $gui")
-        println("Needs hosting: $needsHosting")
+        if(!exitImmediately) {
+            println("Use GUI: $gui")
+            println("Needs hosting: $needsHosting")
+        }
 
-        if (needsHosting || !gui) {
+
+        cleanUp(instanceName)
+
+        if (needsHosting || !gui || exitImmediately) {
             command.add("nogui")
-            val process = ProcessBuilder(command)
-                .directory(instancePath)
-                .inheritIO()
-                .start()
-            process.waitFor()
-            println("Server '$instanceName' exited with code ${process.exitValue()}.")
+            if(exitImmediately) {
+                val process = ProcessBuilder(command)
+                    .directory(instancePath)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                    .redirectError(ProcessBuilder.Redirect.PIPE)
+                    .start()
+
+                process.inputStream.bufferedReader().useLines { lines ->
+                    for (line in lines) {
+                        val logLineRegex = Regex("""\[\d{2}:\d{2}:\d{2}]\s+\[([^\]]+?)/([A-Z]+)]:""")
+                        val match = logLineRegex.find(line)
+                        if (match != null) {
+                            println(line)
+                        }
+
+                        if ("Done (" in line && line.contains("For help, type")){
+                            process.outputStream.bufferedWriter().use { it.write("stop\n"); it.flush() }
+                            break
+                        }
+                    }
+                }
+
+                process.waitFor()
+                println("Server '$instanceName' initialised and exited")
+            } else{
+                val process = ProcessBuilder(command)
+                    .directory(instancePath)
+                    .inheritIO()
+                    .start()
+                process.waitFor()
+                println("Server '$instanceName' exited with code ${process.exitValue()}.")
+            }
+
         } else {
             val process = ProcessBuilder(command)
                 .directory(instancePath)

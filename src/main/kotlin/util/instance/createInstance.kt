@@ -5,9 +5,13 @@ import com.magnariuk.data.configs.Loader
 import com.magnariuk.data.configs.Version
 import com.magnariuk.util.api.checkMinecraftVersion
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.instance.worldApi.resetWorld
+import com.magnariuk.util.prompt
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.text.trim
 
 fun createInstance(
     name: String,
@@ -79,7 +83,13 @@ fun createInstance(
     if (resourcePack.isNotEmpty()) {
         println("  Resource pack: '${Path.of(resourcePack).fileName}' on port $resourcePackPort")
     }
-
+    runBlocking {
+        val delete = prompt("Launching server to initialise all dependencies. Delete the world after? (Y/n): ")
+        launchServer(name, exitImmediately = true)
+        if (delete== "y") {
+            resetWorld(name)
+        }
+    }
     return true
 }
 

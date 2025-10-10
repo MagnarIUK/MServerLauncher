@@ -1,6 +1,9 @@
-package com.magnariuk.util.instance
+package com.magnariuk.util.instance.backupApi
 
+import com.magnariuk.util.ProgressBar
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.instance.getInstance
+import com.magnariuk.util.plugIns.deleteRecursivelyWithProgress
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -45,8 +48,7 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
     val worldFolder = instancePath.resolve("world")
     if (worldFolder.toFile().exists()) {
         try {
-            println("Deleting existing world folder...")
-            worldFolder.toFile().deleteRecursively()
+            worldFolder.toFile().deleteRecursivelyWithProgress("Deleting existing world folder")
         } catch (e: Exception) {
             println("Error removing old world folder: ${e.message}")
             return false
@@ -58,6 +60,8 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
         Files.createDirectories(worldFolder)
 
         ZipFile(backupZipPath.toFile()).use { zip ->
+            val progressBar = ProgressBar(label = "Rolling back")
+            progressBar.start(zip.size())
             zip.entries().asSequence().forEach { entry ->
                 val outPath = worldFolder.resolve(entry.name)
                 if (entry.isDirectory) {
@@ -68,6 +72,7 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
                         Files.copy(input, outPath, StandardCopyOption.REPLACE_EXISTING)
                     }
                 }
+                progressBar.step()
             }
         }
 

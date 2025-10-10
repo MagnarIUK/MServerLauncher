@@ -46,6 +46,7 @@ private fun mergeWithDefaults(cfg: CONFIG): CONFIG {
         apiPassword = cfg.apiPassword.ifBlank { defaults.apiPassword },
         backupOnRollback = cfg.backupOnRollback,
         launched = cfg.launched.ifEmpty { defaults.launched },
-        defaultEditor = cfg.defaultEditor.ifBlank { defaults.defaultEditor }
+        defaultEditor = cfg.defaultEditor.ifBlank { defaults.defaultEditor },
+        showFullProgress = cfg.showFullProgress,
     )
 }

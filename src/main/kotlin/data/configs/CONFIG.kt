@@ -15,4 +15,5 @@ data class CONFIG(
     @SerialName("backup_on_rollback") val backupOnRollback: Boolean = true,
     @SerialName("launched") val launched: List<LAUNCHED_CONFIG> = emptyList(),
     @SerialName("default_editor") val defaultEditor: String = "",
-    )
+    @SerialName("show_full_progress") val showFullProgress: Boolean = true,
+)

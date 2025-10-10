@@ -1,7 +1,9 @@
-package com.magnariuk.util.instance
+package com.magnariuk.util.instance.backupApi
 
 import com.magnariuk.data.configs.Backup
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.instance.editInstance
+import com.magnariuk.util.instance.getInstance
 import com.magnariuk.util.zipWithProgress
 import java.nio.file.Files
 import java.nio.file.Path
@@ -42,7 +44,7 @@ fun backupInstance(instanceName: String, desc: String = ""): Boolean {
     )
 
     return try {
-        if (!zipWithProgress(worldFolder, destinationPath)) return false
+        if (!zipWithProgress(worldFolder, destinationPath, showFullProgress = cfg.showFullProgress)) return false
 
         println("Backup created successfully: ${destinationPath}.zip")
 

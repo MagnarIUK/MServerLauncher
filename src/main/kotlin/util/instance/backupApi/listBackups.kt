@@ -1,8 +1,11 @@
-package com.magnariuk.util.instance
+package com.magnariuk.util.instance.backupApi
 
 import com.magnariuk.util.Table
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.instance.editInstance
+import com.magnariuk.util.instance.getInstance
 import java.nio.file.Path
+import kotlin.collections.iterator
 
 fun listBackups(instanceName: String, printHeader: Boolean = true) {
     val instanceCfg = getInstance(instanceName)
@@ -29,11 +32,11 @@ fun listBackups(instanceName: String, printHeader: Boolean = true) {
 
     for ((backupId, info) in backups) {
         val ts = info.dateTime.replace(".", "").replace(":", "")
-        val backupName = "$ts-world-backup.zip"
-        val backupFile = backupsPath.resolve(backupName)
+        val backupFileName = "$ts-world-backup.zip"
+        val backupFile = backupsPath.resolve(backupFileName)
 
         if (!backupFile.exists()) {
-            println("Missing backup $backupId ($backupName), removing from config...")
+            println("Missing backup $backupId ($backupFileName), removing from config...")
             removed.add(backupId)
             continue
         }

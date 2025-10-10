@@ -1,4 +1,4 @@
-package com.magnariuk.util.instance
+package com.magnariuk.util.instance.configsApi
 
 import com.magnariuk.util.configs.readConfig
 import java.nio.file.Path

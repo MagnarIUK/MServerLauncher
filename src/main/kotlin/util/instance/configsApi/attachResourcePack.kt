@@ -1,5 +1,7 @@
-package com.magnariuk.util.instance
+package com.magnariuk.util.instance.configsApi
 
+import com.magnariuk.util.instance.editInstance
+import com.magnariuk.util.instance.getInstance
 import java.nio.file.Path
 
 fun attachResourcePack(
