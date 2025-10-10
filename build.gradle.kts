@@ -59,14 +59,14 @@ tasks.register<Jar>("fatJar") {
         outputDir.mkdirs()
         val jarFile = archiveFile.get().asFile
         jarFile.copyTo(File(outputDir, jarFile.name), overwrite = true)
-        /*val scriptFile = File(outputDir, "ms")
+        val scriptFile = File(outputDir, "ms")
         val scriptContent = """
             #!/bin/bash
             SCRIPT_DIR=$(dirname "$0")
             java --enable-native-access=ALL-UNNAMED -jar "${'$'}SCRIPT_DIR/${jarFile.name}" "$@"
         """.trimIndent()
         scriptFile.writeText(scriptContent)
-        scriptFile.setExecutable(true)*/
+        scriptFile.setExecutable(true)
     }
 
     dependsOn(configurations.runtimeClasspath)
