@@ -4,6 +4,7 @@ import com.magnariuk.configPath
 import com.magnariuk.data.configs.CONFIG
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
+import kotlin.io.path.div
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
@@ -16,6 +17,11 @@ fun writeConfig(cfg: CONFIG) {
 
 fun readConfig(): CONFIG {
     val defaults = CONFIG()
+    val oldConfig = (configPath.parent / "config.json").toFile()
+    if(oldConfig.exists()) {
+        oldConfig.renameTo(configPath.toFile())
+    }
+
 
     if (Files.exists(configPath)) {
         val content = configPath.readText()
