@@ -54,5 +54,6 @@ private fun mergeWithDefaults(cfg: CONFIG): CONFIG {
         launched = cfg.launched.ifEmpty { defaults.launched },
         defaultEditor = cfg.defaultEditor.ifBlank { defaults.defaultEditor },
         showFullProgress = cfg.showFullProgress,
+        lang = cfg.lang,
     )
 }

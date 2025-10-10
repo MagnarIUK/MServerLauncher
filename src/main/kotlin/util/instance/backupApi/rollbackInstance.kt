@@ -12,11 +12,7 @@ import java.util.zip.ZipFile
 fun rollbackInstance(instanceName: String, backupId: String): Boolean {
     val cfg = readConfig()
     val instancePath = Path.of(cfg.instancesFolder, instanceName)
-    val instanceCfg = getInstance(instanceName) ?: run {
-        println("Error: Instance '$instanceName' not found.")
-        return false
-    }
-
+    val instanceCfg = getInstance(instanceName)!!
     val backups = instanceCfg.backups
     if (!backups.containsKey(backupId)) {
         println("Error: Backup ID '$backupId' not found for instance '$instanceName'.")

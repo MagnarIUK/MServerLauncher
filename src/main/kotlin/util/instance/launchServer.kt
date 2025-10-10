@@ -15,12 +15,7 @@ import kotlin.io.path.div
 
 suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmediately: Boolean = false) {
     val config = readConfig()
-    val instance = getInstance(instanceName)
-
-    if (instance == null) {
-        println("Instance '$instanceName' not found.")
-        return
-    }
+    val instance = getInstance(instanceName)!!
 
     val instancePath = Path.of(config.instancesFolder, instanceName).toFile()
 
@@ -102,20 +97,18 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
         )
 
         val resPack = instance.resourcepack
-        val needsHosting = resPack.isNotEmpty() && !resPack.startsWith("http://") && !resPack.startsWith("https://")
         println("Launching server with command: ${command.joinToString(" ")}")
 
 
 
         if(!exitImmediately) {
             println("Use GUI: $gui")
-            println("Needs hosting: $needsHosting")
         }
 
 
         cleanUp(instanceName)
 
-        if (needsHosting || !gui || exitImmediately) {
+        if (!gui || exitImmediately) {
             command.add("nogui")
             if(exitImmediately) {
                 val process = ProcessBuilder(command)

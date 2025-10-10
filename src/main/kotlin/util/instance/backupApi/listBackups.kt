@@ -8,11 +8,8 @@ import java.nio.file.Path
 import kotlin.collections.iterator
 
 fun listBackups(instanceName: String, printHeader: Boolean = true) {
-    val instanceCfg = getInstance(instanceName)
-    if (instanceCfg == null) {
-        println("Instance '$instanceName' not found.")
-        return
-    }
+    val instanceCfg = getInstance(instanceName)!!
+
 
     val instancePath = Path.of(readConfig().instancesFolder, instanceName)
     val backupsPath = instancePath.resolve("backups").toFile()

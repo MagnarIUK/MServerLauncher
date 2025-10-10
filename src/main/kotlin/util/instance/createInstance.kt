@@ -81,7 +81,7 @@ fun createInstance(
     println("  Memory: $memory")
     println("  Auto-backup: ${if (autoBackup) "Enabled" else "Disabled"}")
     if (resourcePack.isNotEmpty()) {
-        println("  Resource pack: '${Path.of(resourcePack).fileName}' on port $resourcePackPort")
+        println("  Resource pack: '${Path.of(resourcePack).fileName}'")
     }
     runBlocking {
         val delete = prompt("Launching server to initialise all dependencies. Delete the world after? (Y/n): ")

@@ -16,6 +16,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.magnariuk.data.configs.INSTANCE_CONFIG
+import com.magnariuk.util.I18n
 import com.magnariuk.util.configs.editGlobalConfig
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.configsApi.attachResourcePack
@@ -35,6 +36,7 @@ import com.magnariuk.util.instance.backupApi.rollbackInstance
 import com.magnariuk.util.instance.configsApi.updateServerProperties
 import com.magnariuk.util.instance.worldApi.resetWorld
 import com.magnariuk.util.openInDefaultEditor
+import com.magnariuk.util.t
 import com.magnariuk.util.uploadFile
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
@@ -46,16 +48,16 @@ abstract class InstanceCommand(
     val helpText: String
 ) : CliktCommand(name = name) {
     override fun help(context: Context) = helpText.trimIndent()
-    val instance by argument("instance", help = "Name of the instance")
+    val instance by argument("instance", help = t("argument.help.instance"))
     val validatedInstance: String by lazy {
         if (!checkInstance(instance)) {
-            throw CliktError("Instance '$instance' does not exist")
+            throw CliktError(t("argument.errors.instanceNotExists"))
         }
         instance
     }
     val inValidatedInstance: String by lazy {
         if (checkInstance(instance)) {
-            throw CliktError("Instance '$instance' already exists")
+            throw CliktError(t("argument.errors.instanceAlreadyExists"))
         }
         instance
     }
@@ -65,7 +67,7 @@ abstract class OptionalInstanceCommand(
     val helpText: String
 ) : CliktCommand(name = name) {
     override fun help(context: Context) = helpText.trimIndent()
-    val instance by argument("instance", help = "(OPTIONAL) Name of the instance").optional()
+    val instance by argument("instance", help = "${t("argument.help.optionalArgument")}${t("argument.help.instance")}").optional()
     fun withOptionalInstance(
         onInstance: (inst: String) -> Unit,
         onNoInstance: () -> Unit = {}
@@ -79,7 +81,7 @@ abstract class OptionalInstanceCommand(
             if (checkInstance(inst)) {
                 onInstance(inst)
             } else {
-                throw CliktError("Instance '$inst' does not exist")
+                throw CliktError(t("argument.errors.instanceNotExists"))
             }
         } ?: onNoInstance()
     }
@@ -93,24 +95,23 @@ abstract class Command(
     override fun help(context: Context): String = helpString
 }
 
-class CheckInstanceCommand : InstanceCommand("check", "Checks if instance exists.") {
+class CheckInstanceCommand : InstanceCommand("check", t("command.check")) {
     override fun run() {
         outputInstance(validatedInstance)
     }
 }
 
-class CreateInstanceCommand : InstanceCommand("create", "Creates a new instance.") {
+class CreateInstanceCommand : InstanceCommand("create", t("command.create._")) {
     val def = INSTANCE_CONFIG()
-    val version by option("-ver", "--version", help="Instance Version").default(def.version.minecraft, defaultForHelp = def.version.minecraft)
-    val memory by option("-mem", "--memory", help="Memory allocation for the server (e.g., 1024M, 2G). Default is 2048M.").default(def.memory, defaultForHelp = def.memory)
-    val loader by option("-load", "--loader", help="Instance loader. Default is vanilla").default(def.version.loader.type, defaultForHelp = def.version.loader.type)
-    val loaderVersion by option("-lver", "--loader-version", help="Version of loader. Default is latest").default(def.version.loader.version, defaultForHelp = def.version.loader.version)
-    val autoBackup by option("-ab","--auto-backup", help = "Enable auto backup")
+    val version by option("-ver", "--version", help=t("option.version")).default(def.version.minecraft, defaultForHelp = def.version.minecraft)
+    val memory by option("-mem", "--memory", help=t("option.memory")).default(def.memory, defaultForHelp = def.memory)
+    val loader by option("-load", "--loader", help=t("option.loader")).default(def.version.loader.type, defaultForHelp = def.version.loader.type)
+    val loaderVersion by option("-lver", "--loader-version", help=t("option.loaderVersion")).default(def.version.loader.version, defaultForHelp = def.version.loader.version)
+    val autoBackup by option("-ab","--auto-backup", help = t("option.autoBackup"))
         .flag("--no-auto-backup","-nab", default = def.autoBackup, defaultForHelp = def.autoBackup.toString())
 
     val resourcepack by option("-rp", "--resourcepack",
-        help="Path or link to the resource pack .zip file to attach (for 'attach' and 'create' commands).").default(def.resourcepack, defaultForHelp = def.resourcepack)
-    val resourcepackPort by option("-rpp", "--resourcepack-port", help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.").int().default(def.resourcepackPort, def.resourcepackPort.toString())
+        help=t("option.resourcepack")).default(def.resourcepack, defaultForHelp = def.resourcepack)
 
     override fun run() {
         createInstance(
@@ -119,7 +120,6 @@ class CreateInstanceCommand : InstanceCommand("create", "Creates a new instance.
             memory = memory,
             autoBackup = autoBackup,
             resourcePack = resourcepack,
-            resourcePackPort = resourcepackPort,
             loader = loader,
             loaderVersion = loaderVersion
         )
@@ -127,16 +127,16 @@ class CreateInstanceCommand : InstanceCommand("create", "Creates a new instance.
 
 }
 
-class EditInstanceCommand : InstanceCommand("edit", "Edits an existing instance.") {
-    val version by option("-ver", "--version", help="Instance Version")
-    val memory by option("-mem", "--memory", help="Memory allocation for the server (e.g., 1024M, 2G).")
-    val loader by option("-load", "--loader", help="Instance loader.")
-    val loaderVersion by option("-lver", "--loader-version", help="Version of loader.")
-    val autoBackup by option("-ab","--auto-backup", help = "Enable auto backup").flag("-nab","--no-auto-backup")
+class EditInstanceCommand : InstanceCommand("edit", t("command.edit._")) {
+    val version by option("-ver", "--version", help=t("option.version")).default(def.version.minecraft, defaultForHelp = def.version.minecraft)
+    val memory by option("-mem", "--memory", help=t("option.memory")).default(def.memory, defaultForHelp = def.memory)
+    val loader by option("-load", "--loader", help=t("option.loader")).default(def.version.loader.type, defaultForHelp = def.version.loader.type)
+    val loaderVersion by option("-lver", "--loader-version", help=t("option.loaderVersion")).default(def.version.loader.version, defaultForHelp = def.version.loader.version)
+    val autoBackup by option("-ab","--auto-backup", help = t("option.autoBackup"))
+        .flag("--no-auto-backup","-nab", default = def.autoBackup, defaultForHelp = def.autoBackup.toString())
 
     val resourcepack by option("-rp", "--resourcepack",
-        help="Path or link to the resource pack .zip file to attach (for 'attach' and 'create' commands).")
-    val resourcepackPort by option("-rpp", "--resourcepack-port", help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands).").int()
+        help=t("option.resourcepack")).default(def.resourcepack, defaultForHelp = def.resourcepack)
 
 
     override fun run() {
@@ -146,14 +146,13 @@ class EditInstanceCommand : InstanceCommand("edit", "Edits an existing instance.
             memory = memory,
             autoBackup = autoBackup,
             resourcepack = resourcepack,
-            resourcepackPort = resourcepackPort,
             loaderType = loader,
             loaderVersion = loaderVersion
         )
     }
 }
 
-class ListCommand : OptionalInstanceCommand("list", "Lists all instances, or backup in instance if instance is specified.") {
+class ListCommand : OptionalInstanceCommand("list", t("command.list._")) {
     override fun run() {
         withOptionalInstance(
             onInstance = { instance ->
@@ -164,9 +163,9 @@ class ListCommand : OptionalInstanceCommand("list", "Lists all instances, or bac
     }
 }
 
-class LaunchCommand : InstanceCommand("launch", "Launches an existing instance.") {
+class LaunchCommand : InstanceCommand("launch", t("command.launch._")) {
     val gui by option("-gui", "--gui",
-        help="If used, server will launch with GUI").flag()
+        help=t("option.gui")).flag()
 
     override fun run() {
         runBlocking {
@@ -175,9 +174,9 @@ class LaunchCommand : InstanceCommand("launch", "Launches an existing instance."
     }
 }
 
-class BackupInstanceCommand : InstanceCommand("backup", "Backups an existing instance.") {
+class BackupInstanceCommand : InstanceCommand("backup", t("command.backup._")) {
     override val invokeWithoutSubcommand = true
-    val backupDesc by argument("desc", "Optional backup description.").default("")
+    val backupDesc by argument("desc", t("option.backupDesc")).default("")
 
     init {
         subcommands(
@@ -192,8 +191,8 @@ class BackupInstanceCommand : InstanceCommand("backup", "Backups an existing ins
         }
     }
 }
-class RemoveBackupCommand(val instanceProvider: () -> String) : Command("remove", "Removes backup of an existing instance.") {
-    val backupIds by argument("ids", "IDs of a backups you want to restore \n(use 'list <instance>' to check backups)\nIf omitted, will delete all backups").multiple().optional()
+class RemoveBackupCommand(val instanceProvider: () -> String) : Command("remove", t("command.backup.remove")) {
+    val backupIds by argument("ids", t("option.backupIds")).multiple().optional()
     override fun run() {
         backupIds?.let {
             removeBackups(instanceProvider(), it)
@@ -201,48 +200,45 @@ class RemoveBackupCommand(val instanceProvider: () -> String) : Command("remove"
     }
 }
 
-class RollbackInstanceCommand(val instanceProvider: () -> String) : Command("rollback", "Restores backup of an existing instance.") {
-    val backupId by argument("id", "Id of a backup you want to restore \n(use 'list <instance>' to check backups)")
+class RollbackInstanceCommand(val instanceProvider: () -> String) : Command("rollback", t("command.backup.rollback")) {
+    val backupId by argument("id", t("option.backupId"))
     override fun run() {
         rollbackInstance(instanceProvider(), backupId)
     }
 }
 
-class DeleteInstanceCommand : InstanceCommand("delete", "Deletes an existing instance.") {
+class DeleteInstanceCommand : InstanceCommand("delete", t("command.delete")) {
     override fun run() {
         deleteInstance(validatedInstance)
     }
 }
-class OpenInstanceFolderCommand : InstanceCommand("open", "Opens folder with an existing instance.") {
+class OpenInstanceFolderCommand : InstanceCommand("open", t("command.open._")) {
     override fun run() {
         openInstanceFolder(validatedInstance)
     }
 }
-class AttachResourcepackCommand : InstanceCommand("attach", "Attaches an resourcepack to existing instance.") {
-    val resourcepack by argument("resource pack", "Path or link to the resource pack .zip file to attach")
-    val resourcepackPort by option("-rpp", "--resourcepack-port", help="Port for the resource pack HTTP server (for 'attach', 'create', and 'edit' commands). Default is 2548.").int()
-    val upload by option("-u","--upload", help="Upload the file to upload server.").flag()
+class AttachResourcepackCommand : InstanceCommand("attach", t("command.attach._")) {
+    val resourcepack by argument("resource pack", t("option.resourcepack"))
+    val upload by option("-u","--upload", help=t("option.upload")).flag()
 
 
     override fun run() {
         if(upload) {
             try{
                 val link = runBlocking { uploadFile(Path.of(resourcepack))!! }
-                attachResourcePack(instance, link, resourcepackPort)
+                attachResourcePack(instance, link)
             }catch(e: Exception){
-                echo("Failed to upload resourcepack '${resourcepack}': ${e}. Trying to attach file.", err=true)
-                attachResourcePack(instance, resourcepack, resourcepackPort)
+                echo(t("command.attach.failedUpload", mapOf("resourcepack" to resourcepack, "error" to e)), err=true)
             }
+
         }else{
-            attachResourcePack(instance, resourcepack, resourcepackPort)
+            attachResourcePack(instance, resourcepack)
         }
     }
 }
 
-class EditConfigCommand : Command("config",
-    "Edits global config.\n\n" +
-            "If <key value> is omitted, the config file will open in your default editor") {
-    val map: Pair<String, String>? by argument("key value" ,help="(OPTIONAL) Key and value for editing config.").pair().optional()
+class EditConfigCommand : Command("config", t("command.config")) {
+    val map: Pair<String, String>? by argument("key value" ,help="${t("argument.help.optionalArgument")} ${t("option.map")}").pair().optional()
     override fun run() {
         map?.let {
             editGlobalConfig(it.first, it.second)
@@ -253,19 +249,19 @@ class EditConfigCommand : Command("config",
 }
 
 class EditServerPropertiesCommand : InstanceCommand("sp",
-    "Edits server properties of an instance.\n\nIf <key value> is omitted, the server.properties file will open in your default editor") {
-    val map: Pair<String, String>? by argument("key value", "(OPTIONAL) Key and value for editing config.").pair().optional()
+    t("command.sp._")) {
+    val map: Pair<String, String>? by argument("key value", "${t("argument.help.optionalArgument")} ${t("option.map")}").pair().optional()
     override fun run() {
         val file = Path.of(readConfig().instancesFolder, validatedInstance, "server.properties")
         map?.let {
             updateServerProperties(validatedInstance, it.first, it.second)
         } ?: run {
-            openInDefaultEditor(file.toFile(), "server.properties file does not exist for $validatedInstance, launch this instance at least once.")
+            openInDefaultEditor(file.toFile(), t("command.sp.fileNotExists", mapOf("instance" to validatedInstance)))
         }
     }
 }
 
-class WorldCommand : Command("world", "World control api (WIP)"){
+class WorldCommand : Command("world", t("command.world._")){
     init {
         subcommands(
             WorldResetCommand()
@@ -275,15 +271,15 @@ class WorldCommand : Command("world", "World control api (WIP)"){
     override fun run() {}
 
 }
-class WorldResetCommand : InstanceCommand("reset", "Resets world in given instance"){
+class WorldResetCommand : InstanceCommand("reset", t("command.world.reset")){
     override fun run() {
         resetWorld(validatedInstance)
     }
 }
 
-class ModrinthCommand : OptionalInstanceCommand("modrinth", "Not yet implemented") {
+class ModrinthCommand : OptionalInstanceCommand("modrinth", t("argument.nyi")) {
     override fun run() {
-        TODO("Not yet implemented")
+        TODO(t("argument.nyi"))
     }
 }
 class MS : CliktCommand() {
@@ -304,22 +300,11 @@ class MS : CliktCommand() {
     }
 }
 
-object Test{
-    fun main() {
-        val ms = MS()
-        while (true){
-            val input = readln()
-            if (input == "q") { break }
-            try {
-                ms.main(input.split(" "))
-            } catch(e: Exception){
-                println(e.message)
-            }
 
-        }
-    }
+
+
+fun main(args: Array<String>) {
+    I18n.setLocale(readConfig().lang)
+    I18n.loadAllLocales()
+    MS().main(args)
 }
-
-
-fun main(args: Array<String>) = MS().main(args)
-//fun main() = Test.main()

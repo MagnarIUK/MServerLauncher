@@ -16,4 +16,5 @@ data class CONFIG(
     @SerialName("launched") val launched: List<LAUNCHED_CONFIG> = emptyList(),
     @SerialName("default_editor") val defaultEditor: String = "",
     @SerialName("show_full_progress") val showFullProgress: Boolean = true,
+    @SerialName("lang") val lang: String = "en",
 )

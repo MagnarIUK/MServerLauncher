@@ -10,11 +10,6 @@ fun deleteInstance(name: String): Boolean {
     val instancesPath = Path.of(cfg.instancesFolder)
     val instancePath = instancesPath.resolve(name)
 
-    if (!checkInstance(name)) {
-        println("Error: Instance '$name' does not exist.")
-        return false
-    }
-
 
     val input = prompt("Are you sure you want to delete instance '$name'? This action cannot be undone. (y/N): ", "Aborting deletion.", 600000, "n")
     if (input != "y" && input != "yes") {

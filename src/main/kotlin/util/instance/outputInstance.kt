@@ -14,7 +14,6 @@ fun outputInstance(name: String) {
             "Loader" to "${instance.version.loader.type}:${instance.version.loader.version}",
             "Auto-Backup" to instance.autoBackup,
             "Resourcepack" to instance.resourcepack,
-            "Resourcepack port" to instance.resourcepackPort
         )
     )
 

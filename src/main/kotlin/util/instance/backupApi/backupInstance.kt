@@ -13,10 +13,7 @@ import java.time.format.DateTimeFormatter
 fun backupInstance(instanceName: String, desc: String = ""): Boolean {
     val cfg = readConfig()
     val instancePath = Path.of(cfg.instancesFolder, instanceName)
-    val instanceCfg = getInstance(instanceName) ?: run {
-        println("Error: Instance '$instanceName' not found.")
-        return false
-    }
+    val instanceCfg = getInstance(instanceName)!!
 
     if (!instancePath.toFile().isDirectory) {
         println("Error: Instance folder '$instanceName' not found at '$instancePath'.")

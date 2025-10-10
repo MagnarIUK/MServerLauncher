@@ -9,11 +9,8 @@ fun attachResourcePack(
     resourcePackValue: String,
     resourcePackPort: Int? = 2548
 ): Boolean {
-    val instanceCfg = getInstance(instanceName)
-    if (instanceCfg == null) {
-        println("Error: Instance '$instanceName' does not exist. Please create it first.")
-        return false
-    }
+    val instanceCfg = getInstance(instanceName)!!
+
 
     var rpValue = resourcePackValue
     val isUrl = rpValue.startsWith("http://") || rpValue.startsWith("https://")
