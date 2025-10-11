@@ -9,6 +9,8 @@ import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.Path
 
+private val json = Json { prettyPrint = true }
+
 fun editInstance(
     name: String,
     version: String? = null,
@@ -53,7 +55,7 @@ fun editInstance(
     }
 
     Files.createDirectories(instancePath)
-    cfgFile.writeText(Json { prettyPrint = true }.encodeToString(instanceCfg))
+    cfgFile.writeText(json.encodeToString(instanceCfg))
 
     println(t("command.edit.subs.updated", listOf(name)))
 }

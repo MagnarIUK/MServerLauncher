@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.magnariuk"
-version = "1.5.0.7"
+version = "1.5.0.11"
 
 repositories {
     mavenCentral()

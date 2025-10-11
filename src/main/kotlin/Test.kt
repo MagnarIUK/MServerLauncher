@@ -9,8 +9,8 @@ import com.magnariuk.util.t
 object Test{
     fun main() {
         val ms = MS()
-        I18n.setLocale(readConfig().lang)
         I18n.loadAllLocales()
+        I18n.setLocale(readConfig().lang)
         while (true){
             val input = readln()
             if (input == "q") { break }

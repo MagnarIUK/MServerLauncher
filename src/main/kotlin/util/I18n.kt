@@ -1,6 +1,7 @@
 package com.magnariuk.util
 
 import com.magnariuk.DEFAULT_LANGUAGE
+import com.magnariuk.GITHUB_LANG_URL
 import com.magnariuk.configFilePath
 import com.magnariuk.configPath
 import kotlinx.serialization.json.Json
@@ -10,6 +11,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import java.net.URI
+import java.net.URL
+import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 
 
@@ -19,6 +23,14 @@ object I18n {
 
 
     fun setLocale(lang: String) {
+        if (!translations.containsKey(lang)) {
+            println("Locale '$lang' not found locally, attempting download...")
+            if(!downloadLocale(lang)) {
+                println("Falling back to default ($DEFAULT_LANGUAGE)")
+                currentLocale = DEFAULT_LANGUAGE
+                return
+            }
+        }
         currentLocale = lang
     }
     fun getLocale(): String = currentLocale
@@ -52,12 +64,36 @@ object I18n {
             java.nio.file.Paths.get(uri)
         }
 
-        java.nio.file.Files.list(baseDir).use { paths ->
+        Files.list(baseDir).use { paths ->
             paths.filter { it.toString().endsWith(".json") }.forEach { path ->
                 val lang = path.fileName.toString().substringBefore(".json")
-                val text = java.nio.file.Files.newBufferedReader(path).readText()
+                val text = Files.newBufferedReader(path).readText()
                 translations[lang] = Json.parseToJsonElement(text).jsonObject
             }
+        }
+    }
+
+    private fun downloadLocale(lang: String): Boolean {
+        val url = "$GITHUB_LANG_URL/$lang.json"
+        val localesDir = ".lang"
+        val localesPath = configPath.resolve(localesDir).toFile()
+        localesPath.mkdirs()
+        val target = localesPath.resolve("$lang.json")
+
+        try {
+            val con = URI.create(url).toURL().openConnection()
+            con.connectTimeout = 5000
+            con.readTimeout = 5000
+
+            con.getInputStream().use {input ->
+                Files.copy(input, target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+
+            loadExternalLocales()
+            return true
+        } catch (e: Exception) {
+            println("Failed to download language '$lang': ${e.message}")
+            return false
         }
     }
 

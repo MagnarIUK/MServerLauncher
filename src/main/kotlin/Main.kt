@@ -303,7 +303,7 @@ class MS : CliktCommand() {
 
 
 fun main(args: Array<String>) {
-    I18n.setLocale(readConfig().lang)
     I18n.loadAllLocales()
+    I18n.setLocale(readConfig().lang)
     MS().main(args)
 }
