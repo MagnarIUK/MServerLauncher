@@ -1,6 +1,7 @@
 package com.magnariuk.util.instance
 
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.t
 import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -10,8 +11,7 @@ fun openInstanceFolder(instanceName: String): Boolean {
     val instancePath = Path.of(cfg.instancesFolder, instanceName)
 
     if (!instancePath.exists()) {
-        println("Error: Instance folder '$instancePath' does not exist.")
-        println("Make sure the instance has been created.")
+        println(t("command.open.subs.folderNotExists", instancePath))
         return false
     }
 
@@ -26,15 +26,15 @@ fun openInstanceFolder(instanceName: String): Boolean {
                 osName.contains("nix") || osName.contains("nux") || osName.contains("aix") ->
                     Runtime.getRuntime().exec(arrayOf("xdg-open", folderFile.absolutePath))
                 else -> {
-                    println("Opening folders is not supported on this OS: $osName")
+                    println(t("command.open.subs.notSupported", osName))
                     return false
                 }
             }
         }
-        println("Opened folder: $instancePath")
+        println(t("command.open.subs.opened", instancePath))
         true
     } catch (e: Exception) {
-        println("Error opening folder '$instancePath': ${e.message}")
+        println(t("command.open.subs.error", instancePath, e.message))
         false
     }
 }

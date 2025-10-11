@@ -3,6 +3,7 @@ package com.magnariuk.util.instance
 import com.magnariuk.data.configs.INSTANCE_CONFIG
 import com.magnariuk.util.Table
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.t
 import java.nio.file.Path
 
 fun listInstances(): List<Pair<String, INSTANCE_CONFIG>> {
@@ -22,15 +23,19 @@ fun listInstances(): List<Pair<String, INSTANCE_CONFIG>> {
                         foundInstances.add(instanceDir.name to inst)
                     }
                 } catch (e: Exception) {
-                    println("Warning: An error occurred while processing instance '${instanceDir.name}': ${e.message}. Skipping.")
+                    println(t("command.list.subs.errorProcessing", listOf(instanceDir.name, e.message)))
                 }
             }
         }
     }
 
     if (foundInstances.isNotEmpty()) {
-        val title = "--- Available Minecraft Server Instances ---"
-        val columns = listOf("Name" to 20, "Loader" to 15, "Version" to 20, "Memory" to 10)
+        val title = t("command.list.subs.table.title")
+        val columns = listOf(
+            t("command.list.subs.table.name") to 20,
+            t("command.list.subs.table.loader") to 15,
+            t("command.list.subs.table.version") to 20,
+            t("command.list.subs.table.memory") to 10)
         val table = Table(title, columns)
 
         table.printHeader()

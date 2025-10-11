@@ -7,11 +7,14 @@ import com.magnariuk.util.api.checkMinecraftVersion
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.worldApi.resetWorld
 import com.magnariuk.util.prompt
+import com.magnariuk.util.t
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.text.trim
+
+private val json = Json { prettyPrint = true }
 
 fun createInstance(
     name: String,
@@ -29,12 +32,12 @@ fun createInstance(
 
     val validLoaders = setOf("vanilla", "fabric")
     if (loader !in validLoaders) {
-        println("$loader is not a valid loader.")
+        println(t("instance.notValidLoader", listOf(loader)))
         return false
     }
 
     if (!checkMinecraftVersion(version)) {
-        println("$version is not a valid Minecraft version.")
+        println(t("instance.notValidVersion", listOf(version)))
         return false
     }
 
@@ -51,7 +54,7 @@ fun createInstance(
     )
 
     val cfgFile = instancePath.resolve("cfg.json").toFile()
-    cfgFile.writeText(Json { prettyPrint = true }.encodeToString(instanceCfg))
+    cfgFile.writeText(json.encodeToString(instanceCfg))
 
     val eulaFile = instancePath.resolve("eula.txt").toFile()
     val spFile = instancePath.resolve("server.properties").toFile()
@@ -76,15 +79,12 @@ fun createInstance(
         eulaFile.writeText(lines.joinToString("\n") + "\n")
     }
 
-    println("Instance '$name' created successfully.")
-    println("  Version: $loader $version")
-    println("  Memory: $memory")
-    println("  Auto-backup: ${if (autoBackup) "Enabled" else "Disabled"}")
+    println(t("instance.created", listOf(name, loader, version, memory, if (autoBackup) "Enabled" else "Disabled")))
     if (resourcePack.isNotEmpty()) {
-        println("  Resource pack: '${Path.of(resourcePack).fileName}'")
+        println(t("instance.createdRp", listOf(Path.of(resourcePack).fileName)))
     }
     runBlocking {
-        val delete = prompt("Launching server to initialise all dependencies. Delete the world after? (Y/n): ")
+        val delete = prompt(t("prompts.deleteWorldAfterInitializingProperties"))
         launchServer(name, exitImmediately = true)
         if (delete== "y") {
             resetWorld(name)

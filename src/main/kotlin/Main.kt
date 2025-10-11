@@ -14,7 +14,6 @@ import com.github.ajalt.clikt.parameters.arguments.pair
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.types.int
 import com.magnariuk.data.configs.INSTANCE_CONFIG
 import com.magnariuk.util.I18n
 import com.magnariuk.util.configs.editGlobalConfig
@@ -228,7 +227,7 @@ class AttachResourcepackCommand : InstanceCommand("attach", t("command.attach._"
                 val link = runBlocking { uploadFile(Path.of(resourcepack))!! }
                 attachResourcePack(instance, link)
             }catch(e: Exception){
-                echo(t("command.attach.failedUpload", mapOf("resourcepack" to resourcepack, "error" to e)), err=true)
+                echo(t("command.attach.failedUpload", resourcepack, e), err=true)
             }
 
         }else{
@@ -243,7 +242,7 @@ class EditConfigCommand : Command("config", t("command.config")) {
         map?.let {
             editGlobalConfig(it.first, it.second)
         } ?: run {
-            openInDefaultEditor(configPath.toFile())
+            openInDefaultEditor(configFilePath.toFile())
         }
     }
 }
@@ -256,7 +255,7 @@ class EditServerPropertiesCommand : InstanceCommand("sp",
         map?.let {
             updateServerProperties(validatedInstance, it.first, it.second)
         } ?: run {
-            openInDefaultEditor(file.toFile(), t("command.sp.fileNotExists", mapOf("instance" to validatedInstance)))
+            openInDefaultEditor(file.toFile(), t("command.sp.fileNotExists", validatedInstance))
         }
     }
 }

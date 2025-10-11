@@ -1,6 +1,7 @@
 package com.magnariuk.util.api
 
 import com.magnariuk.util.Network
+import com.magnariuk.util.t
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
@@ -20,7 +21,7 @@ suspend fun getFabric(
 
     val installerResponse: HttpResponse = network.get("https://meta.fabricmc.net/v2/versions/installer")
     if (!installerResponse.status.isSuccess()) {
-        println("Failed to fetch installer versions")
+        println(t("util.api.failedFetchInstaller"))
         return null
     }
     val installers = Json.parseToJsonElement(installerResponse.bodyAsText()).jsonArray
@@ -30,7 +31,7 @@ suspend fun getFabric(
         else -> loaders.firstOrNull { it.version == loader }
     }
     if (loaderVer == null) {
-        println("Fabric loader '$loader' not found.")
+        println(t("util.api.fabricLoaderNotFound", loader))
         return null
     }
 
@@ -40,13 +41,13 @@ suspend fun getFabric(
     }
 
     if (installerVer == null) {
-        println("Fabric installer '$installer' not found.")
+        println(t("util.api.fabricInstallerNotFound", installer))
         return null
     }
 
     val loaderVersionStr = loaderVer.version
     val minecraftVersion = getVersion(version, network).id
-    println("Version: $minecraftVersion, Loader: $loaderVersionStr, Installer: $installerVer")
+    println(t("util.api.fabricVersion", minecraftVersion, loaderVersionStr, installerVer))
 
     val url = "https://meta.fabricmc.net/v2/versions/loader/$minecraftVersion/$loaderVersionStr/$installerVer/server/jar"
     return url
@@ -54,7 +55,7 @@ suspend fun getFabric(
 suspend fun getFabricLoaderVersions(network: Network = Network()): List<FabricLoaderVersion> {
     val loaderResponse: HttpResponse = network.get("https://meta.fabricmc.net/v2/versions/loader")
     if (!loaderResponse.status.isSuccess()) {
-        throw Exception("Failed to fetch Fabric loader versions: ${loaderResponse.status}")
+        throw Exception(t("util.api.failedFetchFabricLoader", loaderResponse.status))
     }
     val jsonArray = Json.decodeFromString<List<FabricLoaderVersion>>(loaderResponse.bodyAsText())
     return jsonArray

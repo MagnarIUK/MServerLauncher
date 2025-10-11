@@ -5,64 +5,61 @@
       "instance": "Name of the instance"
     },
     "errors": {
-      "instanceNotExists": "Instance {instance}' does not exist",
-      "instanceAlreadyExists": "Instance {instance}' already exists"
+      "instanceNotExists": "Instance %s' does not exist",
+      "instanceAlreadyExists": "Instance %s' already exists"
     },
-    "nyi":"Not yet implemented"
+    "nyi": "Not yet implemented"
   },
   "command": {
     "check": "Checks if instance exists.",
     "create": {
       "_": "Creates a new instance.",
-      "subs":{
-      }
+      "subs": {}
     },
     "edit": {
       "_": "Edits an existing instance.",
       "subs": {
-        "configNotFoundError": "Instance configuration file not found: {file}",
+        "configNotFoundError": "Instance configuration file not found: %s",
         "useAttach": "Use attach command to add resourcepack.",
-        "updated": "Instance '{instance}' updated successfully."
+        "updated": "Instance '%s' updated successfully."
       }
     },
-
     "list": {
       "_": "Lists all instances, or backup in instance if instance is specified.",
       "subs": {
-        "errorProcessing": "Warning: An error occurred while processing instance '{instance}': {error}. Skipping.",
+        "errorProcessing": "Warning: An error occurred while processing instance '%s': %s. Skipping.",
         "table": {
           "title": "--- Available Minecraft Server Instances ---",
           "name": "Name",
           "loader": "Loader",
           "version": "Version",
           "memory": "Memory"
-          },
+        },
         "noInstances": "No Minecraft server instances found."
-        }
-      },
+      }
+    },
     "launch": {
       "_": "Launches an existing instance.",
-      "subs": {
-        "autoBackup": "Auto-backup enabled. Creating backup for '{instance}' before launch...",
-        "backupDesc": "Auto-backup",
-        "autoBackupFailed": "Auto-backup failed. Continuing with server launch anyway.",
-        "autoBackupCompleted": "Auto-backup completed.",
-        "failedToGetFabric": "Failed to get fabric version.",
-        "failedCalculateFabricSha": "Failed to calculate SHA1 for Fabric server jar.",
-        "unsupportedLoader": "Unsupported loader type: {loader}",
-        "serverDownloadInfoMissing": "Server download information missing from version manifest.",
-        "checkingServerJarSha": "Checking existing server.jar SHA1...",
-        "downloadingJar": "server.jar not found or SHA1 mismatch. Downloading server.jar...",
-        "jarUpToDate": "server.jar is up to date.",
-        "launchingWithCommand": "Launching server with command: {command}",
-        "userGui": "Use GUI: {gui}",
-        "initialisedAndExited": "Server '{instance}' initialised and exited",
-        "serverExited": "Server '{instance}' exited with code {code}.",
-        "serverStarted": "Server process started with PID {pid}.",
-        "networkError": "Network error during server launch: {error}",
-        "javaNotFound": "Error: Java executable '{java}' not found.",
-        "unexcpectedError": "An unexpected error occurred during server launch: {error}"
-      }
+      "autoBackup": "Auto-backup enabled. Creating backup for '%s' before launch...",
+      "backupDesc": "Auto-backup",
+      "autoBackupFailed": "Auto-backup failed. Continuing with server launch anyway.",
+      "autoBackupCompleted": "Auto-backup completed.",
+      "failedToGetFabric": "Failed to get fabric version.",
+      "failedCalculateFabricSha": "Failed to calculate SHA1 for Fabric server jar.",
+      "unsupportedLoader": "Unsupported loader type: %s",
+      "serverDownloadInfoMissing": "Server download information missing from version manifest.",
+      "checkingServerJarSha": "Checking existing server.jar SHA1...",
+      "downloadingJar": "server.jar not found or SHA1 mismatch. Downloading server.jar...",
+      "jarUpToDate": "server.jar is up to date.",
+      "launchingWithCommand": "Launching server with command: %s",
+      "useGui": "Use GUI: %s",
+      "initialisedAndExited": "Server '%s' initialised and exited",
+      "serverExited": "Server '%s' exited with code %s.",
+      "serverStarted": "Server process started with PID %s.",
+      "networkError": "Network error during server launch: %s",
+      "javaNotFound": "Error: Java executable '%s' not found.",
+      "unexpectedError": "An unexpected error occurred during server launch: %s"
+
     },
     "backup": {
       "_": "Backups an existing instance.",
@@ -72,75 +69,77 @@
         "noFiles": "No files to back up.",
         "backingUp": "Backing up",
         "successfulBackup": "\nBackup completed successfully.",
-        "successfulBackupZip": "Backup created successfully: {filename}.zip",
-        "errorBackup": "Error creating backup for '{instance}': {error}",
-        "noBackups": "No backups found for instance '{instance}'.",
+        "successfulBackupZip": "Backup created successfully: %s.zip",
+        "errorBackup": "Error creating backup for '%s': %s",
+        "noBackups": "\nNo backups found for instance '%s'.",
         "table": {
-          "title": "--- Backups for {instance} ---",
-          "columns": ["ID", "Date/Time", "Version", "Description"]
+          "title": "--- Backups for %s ---",
+          "id": "ID",
+          "dt": "Date/Time",
+          "ver": "Version",
+          "desc": "Description"
         },
-        "missingBackup": "Missing backup {id} ({filename}.zip), removing from config...",
+        "missingBackup": "Missing backup %s (%s.zip), removing from config...",
         "removingBackups": "Removing backups",
-        "backupNotFound": "Error: Backup ID '{id}' not found for instance '{instance}'.",
+        "backupNotFound": "Error: Backup ID '%s' not found for instance '%s'.",
         "backupNotFoundAt": "Error: Backup file not found at '$backupZipPath'.",
-        "backupRemoved": "Successfully removed backup {id} ({filename}.zip)",
+        "backupRemoved": "Successfully removed backup %s (%s.zip)",
         "automaticBackup": "Creating automatic backup before rollback...",
-        "autobackupRollbackDesc": "Auto-backup before rollback to {id}",
+        "autobackupRollbackDesc": "Auto-backup before rollback to %s",
         "failedAutoBackup": "Error: Failed to create backup before rollback. Aborting.",
-        "rollingBack": "Rolling back instance '{instance}' using backup '{id}'...",
+        "rollingBack": "Rolling back instance '%s' using backup '%s'...",
         "deletingWorld": "Deleting existing world folder.",
-        "errorDeletingWorld": "Error removing old world folder: {error}",
-        "extractingBackup": "Extracting backup '{filename}' into 'world' folder...",
+        "errorDeletingWorld": "Error removing old world folder: %s",
+        "extractingBackup": "Extracting backup '%s' into 'world' folder...",
         "rollingBackProgress": "Rolling back",
         "rollbackComplete": "Rollback complete.",
-        "errorDuringExtraction": "Error during extraction: {error}"
+        "errorDuringExtraction": "Error during extraction: %s"
       }
     },
     "delete": "Deletes an existing instance.",
     "open": {
       "_": "Opens folder with an existing instance.",
       "subs": {
-        "folderNotExists": "Error: Instance folder '{path}' does not exist.\nMake sure the instance has been created.",
-        "notSupported": "Opening folders is not supported on this OS: {os}",
-        "opened": "Opened folder: {path}",
-        "error": "Error opening folder '{path}': {error}"
+        "folderNotExists": "Error: Instance folder '%s' does not exist.\nMake sure the instance has been created.",
+        "notSupported": "Opening folders is not supported on this OS: %s",
+        "opened": "Opened folder: %s",
+        "error": "Error opening folder '%s': %s"
       }
     },
     "attach": {
       "_": "Attaches an resourcepack to existing instance.",
-      "failedUpload": "Failed to upload resourcepack '{resourcepack}': {error}",
+      "failedUpload": "Failed to upload resourcepack '%s': %s",
       "subs": {
-        "rpNotFound": "Error: Resource pack file '{resourcepack}' not found.",
-        "attached": "Resource pack information attached to '{instance}' successfully.",
+        "rpNotFound": "Error: Resource pack file '%s' not found.",
+        "attached": "Resource pack information attached to '%s' successfully.",
         "disablingResourcePack": "No resource pack specified for this instance. Disabling resource pack settings in server.properties.",
         "failedToCalculateSHA": "Failed to calculate resource pack SHA1 for remote file. Aborting attachment.",
-        "propertiesUpdated": "Resource pack configuration for '{instance}' updated in server.properties.",
+        "propertiesUpdated": "Resource pack configuration for '%s' updated in server.properties.",
         "notValidUrl": "Resource pack should be a valid URL."
       }
     },
     "config": "Edits global config.\n\nIf <key value> is omitted, the config file will open in your default editor.",
     "sp": {
       "_": "Edits server properties of an instance.\n\nIf <key value> is omitted, the server.properties file will open in your default editor.",
-      "fileNotExists": "server.properties file does not exist for {instance}, launch this instance at least once.",
-      "keyNotFound": "Key '{key}' not found in server.properties. No changes made.",
+      "fileNotExists": "server.properties file does not exist for %s, launch this instance at least once.",
+      "keyNotFound": "Key '%s' not found in server.properties. No changes made.",
       "rpWarning": "Resource pack was set in instance config. \nIn the future, use 'attach -rp' to add resource pack to the instance.",
-      "updated": "Updated server.properties: {key}={value}"
+      "updated": "Updated server.properties: %s=%s"
     },
     "world": {
       "_": "World control api (WIP)",
       "reset": "Resets world in given instance.",
       "subs": {
         "deleting": "Deleting world folder",
-        "success": "World for instance '{instance}' has been removed"
+        "success": "World for instance '%s' has been removed"
       }
     }
-
   },
-  "option":{
+  "option": {
     "version": "Instance Version",
     "memory": "Memory allocation for the server (e.g., 1024M, 2G). Default is 2048M.",
-    "loader" : "Instance loader. Default is vanilla.",
-    "loaderVersion" : "Version of loader. Default is latest.",
+    "loader": "Instance loader. Default is vanilla.",
+    "loaderVersion": "Version of loader. Default is latest.",
     "autoBackup": "Enable auto backup",
     "resourcepack": "Link to the resource pack .zip file to attach.",
     "gui": "If used, server will launch with GUI",
@@ -150,51 +149,48 @@
     "upload": {
       "_": "Upload the file to upload server.",
       "apiLogin": "Logging into the API...",
-      "loginFailed": "Login failed: {status}",
+      "loginFailed": "Login failed: %s",
       "uploading": "Uploading file...",
-      "uploadFailed": "Upload failed: {status}",
+      "uploadFailed": "Upload failed: %s",
       "uploadDone": "Upload done.",
       "noFileTokenReturned": "No file token returned!"
     },
     "map": "Key and value for editing config."
-
   },
-
   "util": {
     "table": {
-      "rowCountColumnCountDontMatch": "Error: Row values count ({rows}) does not match column count ({columns})."
+      "rowCountColumnCountDontMatch": "Error: Row values count (%s) does not match column count (%s)."
     },
     "open": {
-      "fileNotExists": "File does not exist: {file}",
-      "failedToStart": "Failed to start {defaultEditor}, falling back to system editor. Error: ${e.message}",
+      "fileNotExists": "File does not exist: %s",
+      "failedToStart": "Failed to start %s, falling back to system editor. Error: ${e.message}",
       "unsupportedAction": "No supported action to open editor.",
       "desktopNotSSupported": "Desktop is not supported on this system."
     },
     "primitives": {
       "deleting": "Deleting",
-      "configOpeningError": "Error reading config: {error}, falling back to defaults.",
-      "keyNotFound": "Warning: Key '{key}' not found in current config. Skipping.",
+      "configOpeningError": "Error reading config: %s, falling back to defaults.",
+      "keyNotFound": "Warning: Key '%s' not found in current config. Skipping.",
       "updatedGlobal": "Global configuration updated successfully.",
       "noSettingsProvided": "No global configuration settings provided to update."
-
     },
     "api": {
-      "fileNotFoundSha": "Error: File not found at '{file}' for SHA1 calculation.",
-      "errorCalculatingSha": "Error calculating SHA1 for '{file}': {error}",
-      "errorDownloadingFile": "Error downloading file from $url: {error}",
-      "versionFound": "Version {ver} is found",
-      "versionNotFound": "Version '{ver}' not found",
-      "versionDoesNotExist": "Version {ver} does not exist: \n{error}",
-      "SHAMismatch": "SHA1 mismatch for {file}: Expected {expected}, got {downloaded}",
-      "SHAVerified": "Download complete and SHA1 verified for {file}.",
-      "failedDownloading": "Failed to download file {url}: {error}",
+      "fileNotFoundSha": "Error: File not found at '%s' for SHA1 calculation.",
+      "errorCalculatingSha": "Error calculating SHA1 for '%s': %s",
+      "errorDownloadingFile": "Error downloading file from %s: %s",
+      "versionFound": "Version %s is found",
+      "versionNotFound": "Version '%s' not found",
+      "versionDoesNotExist": "Version %s does not exist: \n%s",
+      "SHAMismatch": "SHA1 mismatch for %s: Expected %s, got %s",
+      "SHAVerified": "Download complete and SHA1 verified for %s.",
+      "failedDownloading": "Failed to download file %s: %s",
       "failedFetchInstaller": "Failed to fetch installer versions.",
-      "failedFetchFabricLoader": "Failed to fetch Fabric loader versions: {status}",
-      "fabricLoaderNotFound": "Fabric loader '{ver}' not found",
-      "fabricInstallerNotFound": "Fabric installer '{ver}' not found.",
-      "fabricVersion": "Version: {minecraft}, Loader: {loader}, Installer: {installer}",
-      "failedToFetchVersionsMinecraft": "Failed to fetch versions: {status}",
-      "failedToFetchVersion": "Failed to fetch version '{ver}': {status}"
+      "failedFetchFabricLoader": "Failed to fetch Fabric loader versions: %s",
+      "fabricLoaderNotFound": "Fabric loader '%s' not found",
+      "fabricInstallerNotFound": "Fabric installer '%s' not found.",
+      "fabricVersion": "Version: %s, Loader: %s, Installer: %s",
+      "failedToFetchVersionsMinecraft": "Failed to fetch versions: %s",
+      "failedToFetchVersion": "Failed to fetch version '%s': %s"
     }
   },
   "prompts": {
@@ -204,21 +200,21 @@
     "deletingInstanceTimeout": "Aborting deletion.",
     "deletionAborted": "Deletion aborted."
   },
-
-
   "instance": {
-    "folderNotFound": "Error: Instance folder '{instance}' not found at '{instancePath}'.",
-    "worldNotFound": "Error: 'world' folder not found for instance '{instance}'.",
-    "notValidVersion": "{version} is not a valid Minecraft version.",
-    "created": "Instance '{instance}' created successfully.\n  Version: {loader} {version}\n  Memory: {memory}  Auto-backup: {autoBackup}",
-    "createdRp": "  Resource pack: '{rp}'",
+    "folderNotFound": "Error: Instance folder '%s' not found at '%s'.",
+    "worldNotFound": "Error: 'world' folder not found for instance '%s'.",
+    "notValidLoader": "%s is not a valid loader.",
+    "notValidVersion": "%s is not a valid Minecraft version.",
+    "created": "Instance '%s' created successfully.\n  Version: %s %s\n  Memory: %s  Auto-backup: %s",
+    "createdRp": "  Resource pack: '%s'",
     "deleting": "Deleting instance",
-    "deleted": "Instance '{instance}' deleted successfully from '{path}'.",
-    "errorDeleting": "Error deleting instance '{instance}': {error}",
+    "deleted": "Instance '%s' deleted successfully from '%s'.",
+    "errorDeleting": "Error deleting instance '%s': %s",
     "table": {
-      "title": "Instance {instance}",
+      "title": "Instance %s",
       "version": "Version",
       "memory": "Memory",
+      "loader": "Loader",
       "ab": "Auto-Backup",
       "rp": "Resourcepack"
     }

@@ -2,6 +2,7 @@ package com.magnariuk.util.instance.configsApi
 
 import com.magnariuk.util.instance.editInstance
 import com.magnariuk.util.instance.getInstance
+import com.magnariuk.util.t
 import java.nio.file.Path
 
 fun attachResourcePack(
@@ -18,7 +19,7 @@ fun attachResourcePack(
     if (!isUrl) {
         val rpPath = Path.of(rpValue).toFile()
         if (!rpPath.isFile) {
-            println("Error: Resource pack file '$resourcePackValue' not found.")
+            println(t("command.attach.subs.rpNotFound", resourcePackValue))
             return false
         }
         rpValue = rpPath.absolutePath
@@ -30,6 +31,6 @@ fun attachResourcePack(
         isInternal = true
     )
 
-    println("Resource pack information attached to '$instanceName' successfully.")
+    println(t("command.attach.subs.attached", instanceName))
     return true
 }

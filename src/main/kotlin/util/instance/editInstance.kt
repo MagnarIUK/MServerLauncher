@@ -3,6 +3,7 @@ package com.magnariuk.util.instance
 import com.magnariuk.data.configs.Backup
 import com.magnariuk.data.configs.INSTANCE_CONFIG
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.t
 import kotlinx.serialization.json.Json
 import java.io.FileNotFoundException
 import java.nio.file.Files
@@ -25,7 +26,7 @@ fun editInstance(
     val cfgFile = instancePath.resolve("cfg.json").toFile()
 
     if (!cfgFile.exists()) {
-        throw FileNotFoundException("Instance configuration file not found: $cfgFile")
+        throw FileNotFoundException(t("command.edit.subs.configNotFoundError", listOf(cfgFile.absolutePath)))
     }
 
     var instanceCfg = Json.decodeFromString<INSTANCE_CONFIG>(cfgFile.readText())
@@ -45,7 +46,7 @@ fun editInstance(
     )
 
     resourcepack?.let {
-        if (!isInternal) println("Use attach command to add resourcepack.")
+        if (!isInternal) println(t("command.edit.subs.useAttach"))
         else{
             instanceCfg.resourcepack = resourcepack
         }
@@ -54,5 +55,5 @@ fun editInstance(
     Files.createDirectories(instancePath)
     cfgFile.writeText(Json { prettyPrint = true }.encodeToString(instanceCfg))
 
-    println("Instance '$name' updated successfully.")
+    println(t("command.edit.subs.updated", listOf(name)))
 }

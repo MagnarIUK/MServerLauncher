@@ -1,6 +1,7 @@
 package com.magnariuk.util.instance.configsApi
 
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.t
 import java.nio.file.Path
 
 fun updateServerProperties(instanceName: String, key: String, value: String, internal: Boolean = false): Boolean {
@@ -8,7 +9,7 @@ fun updateServerProperties(instanceName: String, key: String, value: String, int
     val serverPropertiesPath = Path.of(instancesFolder, instanceName, "server.properties").toFile()
 
     if (!serverPropertiesPath.exists()) {
-        println("Error: server.properties not found at '${serverPropertiesPath.path}'.")
+        println(t("command.sp.fileNotExists", instanceName))
         return false
     }
 
@@ -24,13 +25,12 @@ fun updateServerProperties(instanceName: String, key: String, value: String, int
     }
 
     if (key !in properties) {
-        println("Key '$key' not found in server.properties. No changes made.")
+        println(t("command.sp.keyNotFound", key))
         return false
     }
 
     if (key == "resource-pack" && !internal) {
-        println("Resource pack was set in instance config. " +
-            "In the future, use 'attach -rp' to add resource pack to the instance")
+        println(t("command.sp.rpWarning"))
         return true
     }
 
@@ -44,6 +44,6 @@ fun updateServerProperties(instanceName: String, key: String, value: String, int
     }
 
     serverPropertiesPath.writeText(newLines.joinToString("\n") + "\n")
-    println("Updated server.properties: $key=$value")
+    println(t("command.sp.updated", key, value))
     return true
 }

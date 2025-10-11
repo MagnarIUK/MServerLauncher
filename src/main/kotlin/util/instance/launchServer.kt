@@ -9,6 +9,7 @@ import com.magnariuk.util.api.getVersion
 import com.magnariuk.util.configs.*
 import com.magnariuk.util.instance.backupApi.backupInstance
 import com.magnariuk.util.instance.configsApi.setResourcePack
+import com.magnariuk.util.t
 import java.nio.file.Path
 import kotlin.concurrent.thread
 import kotlin.io.path.div
@@ -23,11 +24,11 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
     val javaExec = "java"
     try {
         if (instance.autoBackup && !exitImmediately) {
-            println("Auto-backup enabled. Creating backup for '$instanceName' before launch...")
-            if (!backupInstance(instanceName, "Auto-backup")) {
-                println("Auto-backup failed. Continuing with server launch anyway.")
+            println(t("command.launch.autobackup"))
+            if (!backupInstance(instanceName, t("command.launch.backupDesc"))) {
+                println(t("command.launch.autoBackupFailed"))
             } else {
-                println("Auto-backup completed.")
+                println(t("command.launch.autoBackupCompleted"))
             }
         }
 
@@ -43,43 +44,43 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
 
             "fabric" -> {
                 serverJarUrl = getFabric(instance.version.minecraft, loader = instance.version.loader.version) ?: run {
-                    println("Failed to get fabric version.")
+                    println(t("command.launch.failedToGetFabric"))
                     return
                 }
                 println(serverJarUrl)
                 println(instance.version.loader.version)
                 serverSha = calculateRemoteSha1(serverJarUrl) ?: run {
-                    println("Failed to calculate SHA1 for Fabric server jar.")
+                    println(t("command.launch.failedCalculateFabricSha"))
                     return
                 }
             }
 
             else -> {
-                println("Unsupported loader type: ${instance.version.loader.type}")
+                println(t("command.launch.unsupportedLoader", listOf(instance.version.loader.type)))
                 return
             }
         }
 
         if (serverJarUrl.isEmpty() || serverSha.isEmpty()) {
-            println("Server download information missing from version manifest.")
+            println(t("command.launch.serverDownloadInfoMissing"))
             return
         }
-        var versionStr = ver.id
+        var versionStr = "${ver.id}.jar"
         if (instance.version.loader.type == "fabric"){
             versionStr = "fabric-${ver.id}.jar"
         }
         val serverJarFile = (serverJarPath / versionStr).toFile()
         serverJarFile.parentFile.mkdirs()
         val currentSha = if (serverJarFile.exists()) {
-            println("Checking existing server.jar SHA1...")
+            println(t("command.launch.checkingServerJarSha"))
             calculateFileSha1(serverJarFile.absolutePath)
         } else null
 
         if (!serverJarFile.exists() || currentSha != serverSha) {
-            println("server.jar not found or SHA1 mismatch. Downloading server.jar...")
+            println(t("command.launch.downloadingJar"))
             downloadServer(serverJarUrl, serverSha, serverJarFile)
         } else {
-            println("server.jar is up to date.")
+            println(t("command.launch.jarUpToDate"))
         }
 
 
@@ -97,12 +98,12 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
         )
 
         val resPack = instance.resourcepack
-        println("Launching server with command: ${command.joinToString(" ")}")
+        println(t("command.launch.launchingWithCommand", listOf(command.joinToString(" "))))
 
 
 
         if(!exitImmediately) {
-            println("Use GUI: $gui")
+            println(t("command.launch.useGui", listOf(gui)))
         }
 
 
@@ -133,14 +134,14 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
                 }
 
                 process.waitFor()
-                println("Server '$instanceName' initialised and exited")
+                println(t("command.launch.initialisedAndExited"))
             } else{
                 val process = ProcessBuilder(command)
                     .directory(instancePath)
                     .inheritIO()
                     .start()
                 process.waitFor()
-                println("Server '$instanceName' exited with code ${process.exitValue()}.")
+                println(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
             }
 
         } else {
@@ -153,17 +154,17 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
 
 
             thread(start = true, isDaemon = true) {
-                println("Server process started with PID ${process.pid()}.")
+                println(t("command.launch.serverStarted", listOf(process.pid())))
                 process.waitFor()
-                println("Server '$instanceName' exited with code ${process.exitValue()}.")
+                println(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
             }
         }
 
     } catch (e: Exception) {
         when (e) {
-            is java.net.ConnectException, is java.net.UnknownHostException -> println("Network error during server launch: $e")
-            is java.io.FileNotFoundException -> println("Error: Java executable '$javaExec' not found.")
-            else -> println("An unexpected error occurred during server launch: $e")
+            is java.net.ConnectException, is java.net.UnknownHostException -> println(t("command.launch.networkError", listOf(e)))
+            is java.io.FileNotFoundException -> println(t("command.launch.javaNotFound", listOf(javaExec)))
+            else -> println(t("command.launch.unexpectedError", listOf(e)))
         }
     }
 }

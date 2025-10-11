@@ -1,6 +1,7 @@
 package com.magnariuk.util.api
 
 import com.magnariuk.util.Network
+import com.magnariuk.util.t
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.utils.io.readRemaining
 import java.io.File
@@ -10,7 +11,7 @@ import kotlinx.io.readByteArray
 fun calculateFileSha1(filePath: String): String? {
     val file = File(filePath)
     if (!file.exists()) {
-        println("Error: File not found at '$filePath' for SHA1 calculation.")
+        println(t("util.api.fileNotFoundSha", filePath))
         return null
     }
 
@@ -25,7 +26,7 @@ fun calculateFileSha1(filePath: String): String? {
         }
         digest.digest().joinToString("") { "%02x".format(it) }
     } catch (e: Exception) {
-        println("Error calculating SHA1 for '$filePath': ${e.message}")
+        println(t("util.api.errorCalculatingSha", filePath, e.message))
         null
     }
 }
@@ -50,7 +51,7 @@ suspend fun calculateRemoteSha1(
 
         digest.digest().joinToString("") { "%02x".format(it) }
     } catch (e: Exception) {
-        println("Error downloading file from $url: ${e.message}")
+        println(t("util.api.errorDownloadingFile",url, e.message))
         null
     }
 }

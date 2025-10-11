@@ -1,7 +1,8 @@
 package com.magnariuk.util
 
 import com.magnariuk.DEFAULT_LANGUAGE
-import com.magnariuk.util.configs.readConfig
+import com.magnariuk.configFilePath
+import com.magnariuk.configPath
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -9,7 +10,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.util.concurrent.ConcurrentHashMap
 
 
@@ -24,7 +24,23 @@ object I18n {
     fun getLocale(): String = currentLocale
 
     fun loadAllLocales(resourceDir: String = "lang"){
+        loadBuiltInLocale(resourceDir)
+        loadExternalLocales()
+    }
 
+    private fun loadExternalLocales(){
+        val localesDir = ".lang"
+        val localesPath = configPath.resolve(localesDir).toFile()
+
+        val localeFiles = localesPath.listFiles().filter { it.extension == "json" }
+        localeFiles.forEach { file ->
+            val lang = file.nameWithoutExtension
+            val text = file.readText()
+            translations[lang] = Json.parseToJsonElement(text).jsonObject
+        }
+    }
+
+    private fun loadBuiltInLocale(resourceDir: String){
         val classLoader = Thread.currentThread().contextClassLoader
         val resource = classLoader.getResource(resourceDir) ?: return
         val uri = resource.toURI()
@@ -44,6 +60,7 @@ object I18n {
             }
         }
     }
+
     private fun resolveNested(data: JsonObject, key: String): String? {
         var current: JsonElement? = data
         for (part in key.split(".")) {
@@ -59,24 +76,28 @@ object I18n {
 
 
 
-    fun tr(key: String, vars: Map<String, Any?> = emptyMap(), lang: String? = null): String {
+    fun tr(key: String, vars: List<Any?> = emptyList(), lang: String? = null): String {
         val locale = lang ?: currentLocale
         val text = resolveNested(translations[locale] ?: JsonObject(emptyMap()), key)
             ?: resolveNested(translations[DEFAULT_LANGUAGE] ?: JsonObject(emptyMap()), key)
             ?: key
 
-        return text
+        return replaceVars(text, vars)
     }
 
-    private fun replaceVars(text: String, vars: Map<String, Any?>): String {
+    private fun replaceVars(text: String, vars: List<Any?>): String {
         var result = text
-        vars.forEach { (k, v) ->
-            result = result.replace("{$k}", v?.toString() ?: "")
+        vars.forEach { value ->
+            result = result.replaceFirst("%s", value?.toString() ?: "null")
         }
         return result
     }
+
 }
 
-fun t(key: String, vars: Map<String, Any?> = emptyMap()): String {
+fun t(key: String, vars: List<Any?> = emptyList()): String {
     return I18n.tr(key, vars)
+}
+fun t(key: String, vararg vars: Any?): String {
+    return I18n.tr(key, vars.toList())
 }

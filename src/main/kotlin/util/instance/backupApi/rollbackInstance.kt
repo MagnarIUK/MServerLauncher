@@ -4,6 +4,7 @@ import com.magnariuk.util.ProgressBar
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.getInstance
 import com.magnariuk.util.plugIns.deleteRecursivelyWithProgress
+import com.magnariuk.util.t
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -15,7 +16,7 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
     val instanceCfg = getInstance(instanceName)!!
     val backups = instanceCfg.backups
     if (!backups.containsKey(backupId)) {
-        println("Error: Backup ID '$backupId' not found for instance '$instanceName'.")
+        println(t("command.backup.subs.backupNotFound", listOf(backupId, instanceName)))
         return false
     }
 
@@ -27,36 +28,36 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
     val backupZipPath = instancePath.resolve("backups").resolve("$fileNameBase.zip")
 
     if (!backupZipPath.toFile().exists()) {
-        println("Error: Backup file not found at '$backupZipPath'.")
+        println(t("command.backup.subs.backupNotFoundAt", listOf(backupZipPath)))
         return false
     }
 
     if (cfg.backupOnRollback) {
-        println("Creating automatic backup before rollback...")
-        if (!backupInstance(instanceName, desc = "Auto-backup before rollback to $backupId")) {
-            println("Error: Failed to create backup before rollback. Aborting.")
+        println(t("command.backup.subs.automaticBackup"))
+        if (!backupInstance(instanceName, desc = t("command.backup.subs.autobackupRollbackDesc", listOf(backupId)))) {
+            println(t("command.backup.subs.autobackupRollbackDesc"))
             return false
         }
     }
 
-    println("Rolling back instance '$instanceName' using backup '$backupId'...")
+    println(t("command.backup.subs.rollingBack", listOf(instanceName, backupId)))
 
     val worldFolder = instancePath.resolve("world")
     if (worldFolder.toFile().exists()) {
         try {
-            worldFolder.toFile().deleteRecursivelyWithProgress("Deleting existing world folder")
+            worldFolder.toFile().deleteRecursivelyWithProgress(t("command.backup.subs.deletingWorld"))
         } catch (e: Exception) {
-            println("Error removing old world folder: ${e.message}")
+            println(t("command.backup.subs.errorDeletingWorld", listOf(e.message)))
             return false
         }
     }
 
     return try {
-        println("Extracting backup '${backupZipPath.fileName}' into 'world' folder...")
+        println(t("command.backup.subs.extractingBackup", listOf(backupZipPath.fileName)))
         Files.createDirectories(worldFolder)
 
         ZipFile(backupZipPath.toFile()).use { zip ->
-            val progressBar = ProgressBar(label = "Rolling back")
+            val progressBar = ProgressBar(label = t("command.backup.subs.rollingBackProgress"))
             progressBar.start(zip.size())
             zip.entries().asSequence().forEach { entry ->
                 val outPath = worldFolder.resolve(entry.name)
@@ -72,10 +73,10 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
             }
         }
 
-        println("Rollback complete.")
+        println(t("command.backup.subs.rollbackComplete"))
         true
     } catch (e: Exception) {
-        println("Error during extraction: ${e.message}")
+        println(t("command.backup.subs.errorDuringExtraction", listOf(e.message)))
         false
     }
 }

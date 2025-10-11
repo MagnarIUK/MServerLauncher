@@ -2,6 +2,7 @@ package com.magnariuk.util.api
 
 import com.magnariuk.util.Network
 import com.magnariuk.util.interfaces.Download
+import com.magnariuk.util.t
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.contentLength
 import io.ktor.utils.io.readRemaining
@@ -55,13 +56,13 @@ suspend fun downloadServer(
 
         val downloadedSha = sha1.digest().joinToString("") { "%02x".format(it) }
         if (!downloadedSha.equals(expectedSha, ignoreCase = true)) {
-            throw IllegalStateException("SHA1 mismatch for ${destination.name}: Expected $expectedSha, got $downloadedSha")
+            throw IllegalStateException(t("util.api.SHAMismatch", destination.name, expectedSha, downloadedSha))
         }
 
-        println("Download complete and SHA1 verified for ${destination.name}.")
+        println(t("util.api.SHAVerified", destination.name))
         return true
 
     } catch (e: Exception) {
-        throw Exception("Failed to download file $url: ${e.message}", e)
+        throw Exception(t("util.api.failedDownloading", url, e.message), e)
     }
 }

@@ -5,6 +5,7 @@ import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.editInstance
 import com.magnariuk.util.instance.getInstance
 import com.magnariuk.util.prompt
+import com.magnariuk.util.t
 import java.nio.file.Path
 
 fun removeBackups(instanceName: String, backupIds: List<String>): Boolean {
@@ -16,11 +17,11 @@ fun removeBackups(instanceName: String, backupIds: List<String>): Boolean {
     val removedBackups = mutableListOf<String>()
 
 
-    val progressBar = ProgressBar("Removing backups", useMessages = true)
+    val progressBar = ProgressBar(t("command.backup.subs.removingBackups"), useMessages = true)
     progressBar.start(backupIds.size)
     for (backupId in backupIds) {
         if (!backups.containsKey(backupId)) {
-            println("Error: Backup ID '$backupId' not found for instance '$instanceName'.")
+            println(t("command.backup.subs.backupNotFound", listOf(backupId, instanceName)))
             return false
         }
 
@@ -32,14 +33,14 @@ fun removeBackups(instanceName: String, backupIds: List<String>): Boolean {
         val backupZipPath = instancePath.resolve("backups").resolve("$fileNameBase.zip")
 
         if (!backupZipPath.toFile().exists()) {
-            println("Missing backup $backupId ($fileNameBase.zip), removing from config...")
+            println(t("command.backup.subs.missingBackup", listOf(backupId, fileNameBase)))
             removedBackups.add(backupId)
             continue
         }
 
         backupZipPath.toFile().delete()
         removedBackups.add(backupId)
-        progressBar.step(message = "Successfully removed backup $backupId ($fileNameBase.zip)")
+        progressBar.step(message = t("command.backup.subs.backupRemoved", listOf(backupId, fileNameBase)))
     }
 
     removedBackups.forEach { backups.remove(it) }
@@ -49,44 +50,15 @@ fun removeBackups(instanceName: String, backupIds: List<String>): Boolean {
 }
 
 fun removeAllBackups(instanceName: String): Boolean {
-    val areYouSure = prompt("Are you sure you want to remove all backups in '$instanceName' instance? (y/N): ", timeoutMs = 600000, default = "n")
+    val areYouSure = prompt(t("prompts.removeBackups"), timeoutMs = 600000, default = "n")
 
     if (areYouSure == "n") {
         return false
     }
-
-    val cfg = readConfig()
-    val instancePath = Path.of(cfg.instancesFolder, instanceName)
     val instanceCfg = getInstance(instanceName)!!
+    val backups = instanceCfg.backups.keys.toList()
 
-    val backups = instanceCfg.backups.toMutableMap()
-    val removedBackups = mutableListOf<String>()
-
-
-    val progressBar = ProgressBar("Removing backups", useMessages = true)
-    progressBar.start(backups.size)
-    for ( backup in backups) {
-
-        val backupInfo = backup.value
-        val timestamp = backupInfo.dateTime
-        val version = backupInfo.version
-
-        val fileNameBase = "${timestamp.replace(".", "").replace(":", "")}-world-backup"
-        val backupZipPath = instancePath.resolve("backups").resolve("$fileNameBase.zip")
-
-        if (!backupZipPath.toFile().exists()) {
-            println("Missing backup ${backup.key} ($fileNameBase.zip), removing from config...")
-            removedBackups.add(backup.key)
-            continue
-        }
-
-        backupZipPath.toFile().delete()
-        removedBackups.add(backup.key)
-        progressBar.step(message = "Successfully removed backup ${backup.key} ($fileNameBase.zip)")
-    }
-
-    removedBackups.forEach { backups.remove(it) }
-    editInstance(instanceName, backups = backups)
+    removeBackups(instanceName, backups)
 
     return true
 }

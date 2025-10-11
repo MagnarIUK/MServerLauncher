@@ -3,6 +3,7 @@ package com.magnariuk.util.instance
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.plugIns.deleteRecursivelyWithProgress
 import com.magnariuk.util.prompt
+import com.magnariuk.util.t
 import java.nio.file.Path
 
 fun deleteInstance(name: String): Boolean {
@@ -11,18 +12,18 @@ fun deleteInstance(name: String): Boolean {
     val instancePath = instancesPath.resolve(name)
 
 
-    val input = prompt("Are you sure you want to delete instance '$name'? This action cannot be undone. (y/N): ", "Aborting deletion.", 600000, "n")
+    val input = prompt(t("prompts.deleteInstance", name), t("prompts.deletingInstanceTimeout"), 600000, "n")
     if (input != "y" && input != "yes") {
-        println("Deletion aborted.")
+        println(t("prompts.deletionAborted"))
         return false
     }
 
     return try {
-        instancePath.toFile().deleteRecursivelyWithProgress("Deleting instance")
-        println("Instance '$name' deleted successfully from '$instancePath'.")
+        instancePath.toFile().deleteRecursivelyWithProgress(t("instance.deleting"))
+        println(t("instance.deleted", name, instancesPath))
         true
     } catch (e: Exception) {
-        println("Error deleting instance '$name': ${e.message}")
+        println(t("instance.errorDeleting", name, e.message))
         false
     }
 }

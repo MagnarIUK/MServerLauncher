@@ -1,7 +1,8 @@
 package com.magnariuk.util.configs
 
-import com.magnariuk.configPath
+import com.magnariuk.configFilePath
 import com.magnariuk.data.configs.CONFIG
+import com.magnariuk.util.t
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.io.path.div
@@ -11,24 +12,24 @@ import kotlin.io.path.writeText
 private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true }
 
 fun writeConfig(cfg: CONFIG) {
-    Files.createDirectories(configPath.parent)
-    configPath.writeText(json.encodeToString(cfg))
+    Files.createDirectories(configFilePath.parent)
+    configFilePath.writeText(json.encodeToString(cfg))
 }
 
 fun readConfig(): CONFIG {
     val defaults = CONFIG()
-    val oldConfig = (configPath.parent / "config.json").toFile()
+    val oldConfig = (configFilePath.parent / "config.json").toFile()
     if(oldConfig.exists()) {
-        oldConfig.renameTo(configPath.toFile())
+        oldConfig.renameTo(configFilePath.toFile())
     }
 
 
-    if (Files.exists(configPath)) {
-        val content = configPath.readText()
+    if (Files.exists(configFilePath)) {
+        val content = configFilePath.readText()
         val loaded = try {
             json.decodeFromString<CONFIG>(content)
         } catch (e: Exception) {
-            println("Error reading config: ${e.message}, falling back to defaults.")
+            println(t("util.primitives.configOpeningError", e.message))
             defaults
         }
 

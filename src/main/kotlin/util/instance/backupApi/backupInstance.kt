@@ -4,6 +4,7 @@ import com.magnariuk.data.configs.Backup
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.editInstance
 import com.magnariuk.util.instance.getInstance
+import com.magnariuk.util.t
 import com.magnariuk.util.zipWithProgress
 import java.nio.file.Files
 import java.nio.file.Path
@@ -15,17 +16,13 @@ fun backupInstance(instanceName: String, desc: String = ""): Boolean {
     val instancePath = Path.of(cfg.instancesFolder, instanceName)
     val instanceCfg = getInstance(instanceName)!!
 
-    if (!instancePath.toFile().isDirectory) {
-        println("Error: Instance folder '$instanceName' not found at '$instancePath'.")
-        return false
-    }
 
     val backupsPath = instancePath.resolve("backups")
     Files.createDirectories(backupsPath)
 
     val worldFolder = instancePath.resolve("world")
     if (!worldFolder.toFile().isDirectory) {
-        println("Error: 'world' folder not found for instance '$instanceName'.")
+        println(t("instance.worldNotFound", listOf(instanceName)))
         return false
     }
 
@@ -43,7 +40,7 @@ fun backupInstance(instanceName: String, desc: String = ""): Boolean {
     return try {
         if (!zipWithProgress(worldFolder, destinationPath, showFullProgress = cfg.showFullProgress)) return false
 
-        println("Backup created successfully: ${destinationPath}.zip")
+        println(t("command.backup.subs.successfulBackupZip", listOf(destinationPath)))
 
         val updatedBackups = instanceCfg.backups.toMutableMap()
         updatedBackups[backupId] = backup
@@ -52,7 +49,7 @@ fun backupInstance(instanceName: String, desc: String = ""): Boolean {
 
         true
     } catch (e: Exception) {
-        println("Error creating backup for '$instanceName': ${e.message}")
+        println(t("command.backup.subs.errorBackup", listOf(instanceName, e.message)))
         false
     }
 }

@@ -1,5 +1,6 @@
 package com.magnariuk.util.api
 
+import com.magnariuk.util.t
 import kotlinx.coroutines.runBlocking
 
 fun checkMinecraftVersion(ver: String): Boolean {
@@ -8,10 +9,12 @@ fun checkMinecraftVersion(ver: String): Boolean {
         else -> {
             try {
                 runBlocking { getVersion(ver) }
-                println("Version $ver is found")
+                // "Version %s is found"
+                println(t("util.api.versionFound", ver))
                 true
             } catch (e: Exception) {
-                println("Version $ver does not exist: \n${e.message}")
+                // "Version %s does not exist: \n%s"
+                println(t("util.api.versionDoesNotExist", ver, e.message))
                 false
             }
         }

@@ -2,18 +2,18 @@ package com.magnariuk.util.instance.configsApi
 
 import com.magnariuk.util.Network
 import com.magnariuk.util.api.calculateRemoteSha1
-import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.getInstance
+import com.magnariuk.util.t
 
 suspend fun setResourcePack(instanceName: String, network: Network = Network()): Boolean {
     val instanceCfg = getInstance(instanceName) ?: return false
     val rpValue = instanceCfg.resourcepack
 
     if (rpValue.isEmpty()) {
-        println("No resource pack specified for this instance. Disabling resource pack settings in server.properties.")
+        println(t("command.attach.subs.disablingResourcePack"))
         updateServerProperties(instanceName, "require-resource-pack", "false", internal = true)
-        updateServerProperties(instanceName, "resource-pack", "",internal = true)
-        updateServerProperties(instanceName, "resource-pack-sha1", "",internal = true)
+        updateServerProperties(instanceName, "resource-pack", "", internal = true)
+        updateServerProperties(instanceName, "resource-pack-sha1", "", internal = true)
         return true
     }
 
@@ -23,18 +23,18 @@ suspend fun setResourcePack(instanceName: String, network: Network = Network()):
     if (isUrl) {
         val rpSha1 = calculateRemoteSha1(rpValue, network = network)
         if (rpSha1 == null) {
-            println("Failed to calculate resource pack SHA1 for remote file. Aborting attachment.")
+            println(t("command.attach.subs.failedToCalculateSHA"))
             return false
         }
 
-        updateServerProperties(instanceName, "resource-pack", rpValue,internal = true)
-        updateServerProperties(instanceName, "resource-pack-sha1", rpSha1,internal = true)
+        updateServerProperties(instanceName, "resource-pack", rpValue, internal = true)
+        updateServerProperties(instanceName, "resource-pack-sha1", rpSha1, internal = true)
 
-        println("Resource pack configuration for '$instanceName' updated in server.properties.")
+        println(t("command.attach.subs.propertiesUpdated", instanceName))
         return true
 
     } else {
-        println("Resource pack should be a valid URL.")
+        println(t("command.attach.subs.notValidUrl"))
         return false
     }
 }

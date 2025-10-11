@@ -4,6 +4,7 @@ import com.magnariuk.data.minecraft.Manifest
 import com.magnariuk.data.minecraft.Package
 import com.magnariuk.util.Network
 import com.magnariuk.util.VersionNotFoundException
+import com.magnariuk.util.t
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -17,10 +18,9 @@ suspend fun getVersions(network: Network = Network()): Manifest {
         val bodyText = response.bodyAsText()
         return Json.decodeFromString<Manifest>(bodyText)
     } else {
-        throw Exception("Failed to fetch versions: ${response.status}")
+        throw Exception(t("util.api.failedToFetchVersionsMinecraft", response.status))
     }
 }
-
 suspend fun getVersion(versionId: String, network: Network = Network()): Package {
     val manifest = getVersions(network)
     val versions = manifest.versions
@@ -32,14 +32,13 @@ suspend fun getVersion(versionId: String, network: Network = Network()): Package
     }
 
     val versionEntry = versions.firstOrNull { it.id == ver }
-        ?: throw VersionNotFoundException("Version '$ver' not found.")
+        ?: throw VersionNotFoundException(t("util.api.versionNotFound", ver))
 
     val response = network.get(versionEntry.url)
     if (response.status == HttpStatusCode.OK) {
         val bodyText = response.bodyAsText()
         return Json.decodeFromString<Package>(bodyText)
     } else {
-        throw Exception("Failed to fetch version '$ver': ${response.status}")
+        throw Exception(t("util.api.failedToFetchVersion", ver, response.status))
     }
 }
-

@@ -1,12 +1,13 @@
 package com.magnariuk.util.configs
 
-import com.magnariuk.configPath
+import com.magnariuk.configFilePath
+import com.magnariuk.util.t
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.*
 
 
 fun editGlobalConfig(key: String? = null, value: String? = null) {
-    val configFile = configPath.toFile()
+    val configFile = configFilePath.toFile()
     val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     val currentConfig = json.parseToJsonElement(configFile.readText()).jsonObject.toMutableMap()
@@ -14,7 +15,7 @@ fun editGlobalConfig(key: String? = null, value: String? = null) {
     var updated = false
     if (key != null && value != null) {
         if (!currentConfig.containsKey(key)) {
-            println("Warning: Key '$key' not found in current config. Skipping.")
+            println(t("util.primitives.keyNotFound", key))
         } else {
             val parsedValue: JsonElement = try {
                 json.parseToJsonElement(value)
@@ -29,8 +30,8 @@ fun editGlobalConfig(key: String? = null, value: String? = null) {
     if (updated) {
         val newJson = JsonObject(currentConfig)
         configFile.writeText(json.encodeToString(newJson))
-        println("Global configuration updated successfully.")
+        println(t("util.primitives.updatedGlobal"))
     } else {
-        println("No global configuration settings provided to update.")
+        println(t("util.primitives.noSettingsProvided"))
     }
 }
