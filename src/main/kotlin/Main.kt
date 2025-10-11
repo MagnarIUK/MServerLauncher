@@ -324,6 +324,7 @@ class MS : CliktCommand() {
 
 
 fun main(args: Array<String>) {
+    runBlocking { checkUpdates() }
     I18n.loadAllLocales()
     I18n.setLocale(readConfig().lang)
     MS().main(args)
