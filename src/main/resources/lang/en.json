@@ -133,6 +133,15 @@
         "deleting": "Deleting world folder",
         "success": "World for instance '%s' has been removed"
       }
+    },
+    "info": {
+      "_": "Shows info about program",
+      "tableTitle": "%s info",
+      "ver": "Version",
+      "buildNumber": "build no.",
+      "author": "Author",
+      "translations": "Translations",
+      "buildTime": "Build Time"
     }
   },
   "option": {

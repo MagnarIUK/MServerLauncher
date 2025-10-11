@@ -9,11 +9,9 @@ fun checkMinecraftVersion(ver: String): Boolean {
         else -> {
             try {
                 runBlocking { getVersion(ver) }
-                // "Version %s is found"
                 println(t("util.api.versionFound", ver))
                 true
             } catch (e: Exception) {
-                // "Version %s does not exist: \n%s"
                 println(t("util.api.versionDoesNotExist", ver, e.message))
                 false
             }

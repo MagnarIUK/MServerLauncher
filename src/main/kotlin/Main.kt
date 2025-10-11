@@ -14,10 +14,14 @@ import com.github.ajalt.clikt.parameters.arguments.pair
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.magnariuk.MServerLauncher.BuildConfig
 import com.magnariuk.data.configs.INSTANCE_CONFIG
 import com.magnariuk.util.I18n
+import com.magnariuk.util.Table
+import com.magnariuk.util.checkUpdates
 import com.magnariuk.util.configs.editGlobalConfig
 import com.magnariuk.util.configs.readConfig
+import com.magnariuk.util.getLatestRelease
 import com.magnariuk.util.instance.configsApi.attachResourcePack
 import com.magnariuk.util.instance.backupApi.backupInstance
 import com.magnariuk.util.instance.checkInstance
@@ -281,6 +285,23 @@ class ModrinthCommand : OptionalInstanceCommand("modrinth", t("argument.nyi")) {
         TODO(t("argument.nyi"))
     }
 }
+class InfoCommand : Command("info", t("command.info._")) {
+    override fun run() {
+        val table = Table(t("command.info.tableTitle", BuildConfig.APP_NAME))
+        var verStr = "${BuildConfig.APP_VERSION} ${t("command.info.buildNumber")} ${BuildConfig.BUILD_NUMBER}"
+        val latestVer = runBlocking { checkUpdates(justChecking = true) }
+        if(latestVer != BuildConfig.APP_VERSION) verStr+=" | ${yellow}UPDATE TO $latestVer IS AVAILABLE$reset"
+        table.printVertical(mapOf(
+            t("command.info.ver") to verStr,
+            t("command.info.buildTime") to BuildConfig.BUILD_TIME,
+            t("command.info.author") to BuildConfig.AUTHOR,
+            t("command.info.translations") to BuildConfig.Tranlators,
+            "GitHub" to BuildConfig.GITHUB,
+        ))
+    }
+
+}
+
 class MS : CliktCommand() {
     override fun run() {}
 
@@ -294,7 +315,7 @@ class MS : CliktCommand() {
             DeleteInstanceCommand(), OpenInstanceFolderCommand(),
             AttachResourcepackCommand(), EditConfigCommand(),
             EditServerPropertiesCommand(), ModrinthCommand(),
-            WorldCommand(),
+            WorldCommand(), InfoCommand()
         )
     }
 }

@@ -56,5 +56,6 @@ private fun mergeWithDefaults(cfg: CONFIG): CONFIG {
         defaultEditor = cfg.defaultEditor.ifBlank { defaults.defaultEditor },
         showFullProgress = cfg.showFullProgress,
         lang = cfg.lang,
+        checkUpdateInterval = cfg.checkUpdateInterval,
     )
 }
