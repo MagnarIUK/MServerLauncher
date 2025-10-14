@@ -1,5 +1,6 @@
 package com.magnariuk.util.instance.backupApi
 
+import com.magnariuk.data.configs.CONFIG
 import com.magnariuk.util.ProgressBar
 import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.instance.getInstance
@@ -57,6 +58,7 @@ fun rollbackInstance(instanceName: String, backupId: String): Boolean {
         Files.createDirectories(worldFolder)
 
         ZipFile(backupZipPath.toFile()).use { zip ->
+            val maxLogSize = if(zip.size() < readConfig().logMaxLines) zip.size() else readConfig().logMaxLines
             val progressBar = ProgressBar(label = t("command.backup.subs.rollingBackProgress"))
             progressBar.start(zip.size())
             zip.entries().asSequence().forEach { entry ->

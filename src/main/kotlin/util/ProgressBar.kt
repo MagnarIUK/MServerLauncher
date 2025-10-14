@@ -1,8 +1,5 @@
 package com.magnariuk.util
 
-import kotlin.math.max
-import kotlin.random.Random
-
 class ProgressBar(
     private val label: String = "",
     private val barLength: Int = 30,

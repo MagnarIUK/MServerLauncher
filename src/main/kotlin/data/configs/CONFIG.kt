@@ -24,6 +24,7 @@ data class CONFIG(
     @SerialName("show_full_progress") var showFullProgress: Boolean = true,
     @SerialName("lang") var lang: String = "en",
     @SerialName("checkUpdateInterval") var checkUpdateInterval: Long = 3_600_000,
+    @SerialName("logMaxLines") var logMaxLines: Int = 4,
 ) : Configurable<CONFIG> {
     override val file: File
         get() = configFilePath.toFile()
@@ -33,7 +34,7 @@ data class CONFIG(
 
     companion object: ConfigurableCompanion<CONFIG> {
         override val file: File
-            get() = cacheFilePath.toFile()
+            get() = configFilePath.toFile()
         override fun default(): CONFIG = CONFIG()
     }
 }

@@ -15,7 +15,7 @@ if (versionFile.exists()) {
 
 var buildNumber = versionProps.getProperty("buildNumber", "0").toInt()
 
-var baseVersion = "1.5.1"
+var baseVersion = "1.5.2"
 
 version = "$baseVersion.$buildNumber"
 group = "com.magnariuk"

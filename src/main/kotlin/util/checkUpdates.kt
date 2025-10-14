@@ -39,8 +39,6 @@ suspend fun checkUpdates(network: Network = Network(), justChecking: Boolean = f
             if(!justChecking){
                 if (currentVersion != latestTag) {
                     println("\n$yellow${"#".repeat(50)}\n\tNEW VERSION (${latestTag}) IS AVAILABLE!\n\tYou currently on version $currentVersion.\n${"#".repeat(50)}$reset\n")
-                } else {
-                    println("\n$yellow${"#".repeat(50)}\n\tNEW VERSION (${latestTag}) IS NOT AVAILABLE!\n\tYou currently on version $currentVersion.\n${"#".repeat(50)}$reset\n")
                 }
             }
 

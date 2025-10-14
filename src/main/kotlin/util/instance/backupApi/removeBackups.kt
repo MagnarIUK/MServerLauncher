@@ -16,8 +16,8 @@ fun removeBackups(instanceName: String, backupIds: List<String>): Boolean {
     val backups = instanceCfg.backups.toMutableMap()
     val removedBackups = mutableListOf<String>()
 
-
-    val progressBar = ProgressBar(t("command.backup.subs.removingBackups"), useMessages = true)
+    val maxProgressLogs = if (backupIds.size < cfg.logMaxLines) backupIds.size else cfg.logMaxLines
+    val progressBar = ProgressBar(t("command.backup.subs.removingBackups"), useMessages = true, maxMessageLines = maxProgressLogs)
     progressBar.start(backupIds.size)
     for (backupId in backupIds) {
         if (!backups.containsKey(backupId)) {
