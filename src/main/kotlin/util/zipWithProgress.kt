@@ -24,6 +24,7 @@ fun zipWithProgress(sourcePath: Path, destinationPath: Path, showFullProgress: B
 
     ZipOutputStream(Files.newOutputStream(destinationPath.resolveSibling("${destinationPath.fileName}.zip"))).use { zipOut ->
         val maxLogLines = if(fileList.size < readConfig().logMaxLines) fileList.size else readConfig().logMaxLines
+        println("Max log lines: $maxLogLines")
         val progressBar = ProgressBar(label = "Backing up", useMessages = showFullProgress, maxMessageLines = maxLogLines)
         progressBar.start(total)
         for (pair in fileList) {

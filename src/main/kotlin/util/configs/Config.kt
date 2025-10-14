@@ -57,5 +57,6 @@ private fun mergeWithDefaults(cfg: CONFIG): CONFIG {
         showFullProgress = cfg.showFullProgress,
         lang = cfg.lang,
         checkUpdateInterval = cfg.checkUpdateInterval,
+        logMaxLines = cfg.logMaxLines,
     )
 }
