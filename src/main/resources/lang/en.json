@@ -5,8 +5,8 @@
       "instance": "Name of the instance"
     },
     "errors": {
-      "instanceNotExists": "Instance %s' does not exist",
-      "instanceAlreadyExists": "Instance %s' already exists"
+      "instanceNotExists": "Instance '%s' does not exist",
+      "instanceAlreadyExists": "Instance '%s' already exists"
     },
     "nyi": "Not yet implemented"
   },

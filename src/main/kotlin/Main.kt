@@ -54,13 +54,13 @@ abstract class InstanceCommand(
     val instance by argument("instance", help = t("argument.help.instance"))
     val validatedInstance: String by lazy {
         if (!checkInstance(instance)) {
-            throw CliktError(t("argument.errors.instanceNotExists"))
+            throw CliktError(t("argument.errors.instanceNotExists", instance))
         }
         instance
     }
     val inValidatedInstance: String by lazy {
         if (checkInstance(instance)) {
-            throw CliktError(t("argument.errors.instanceAlreadyExists"))
+            throw CliktError(t("argument.errors.instanceAlreadyExists", instance))
         }
         instance
     }
