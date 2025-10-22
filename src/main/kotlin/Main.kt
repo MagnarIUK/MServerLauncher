@@ -302,6 +302,7 @@ class InfoCommand : Command("info", t("command.info._")) {
 }
 
 class MS : CliktCommand() {
+    override fun help(context: Context): String = "[<options>] also include instance name now!"
     override fun run() {}
 
     init {

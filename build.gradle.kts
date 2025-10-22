@@ -20,12 +20,14 @@ var baseVersion = "1.5.3"
 if (project.hasProperty("rbn")) {
     buildNumber = 0
     println("Build number has been reset to 0.")
-    versionProps.setProperty("buildNumber", buildNumber.toString())
-    versionFile.outputStream().use {
-        versionProps.store(it, "This file stores the auto-incremented build number.")
-    }
+} else {
+    buildNumber++
 }
 
+versionProps.setProperty("buildNumber", buildNumber.toString())
+versionFile.outputStream().use {
+    versionProps.store(it, "This file stores the auto-incremented build number.")
+}
 
 
 version = "$baseVersion.$buildNumber"
@@ -83,21 +85,6 @@ application {
 }
 
 tasks.register<Jar>("fatJar") {
-    doFirst {
-        if (project.hasProperty("rbn")) {
-            buildNumber = 0
-            println("Build number has been reset to 0.")
-        } else {
-            buildNumber++
-        }
-
-        versionProps.setProperty("buildNumber", buildNumber.toString())
-        versionFile.outputStream().use {
-            versionProps.store(it, "This file stores the auto-incremented build number.")
-        }
-    }
-
-
     group = "build"
     archiveClassifier.set("all")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
