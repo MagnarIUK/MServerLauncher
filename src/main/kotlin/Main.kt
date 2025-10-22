@@ -21,7 +21,6 @@ import com.magnariuk.util.Table
 import com.magnariuk.util.checkUpdates
 import com.magnariuk.util.configs.editGlobalConfig
 import com.magnariuk.util.configs.readConfig
-import com.magnariuk.util.getLatestRelease
 import com.magnariuk.util.instance.configsApi.attachResourcePack
 import com.magnariuk.util.instance.backupApi.backupInstance
 import com.magnariuk.util.instance.checkInstance
@@ -320,6 +319,26 @@ class MS : CliktCommand() {
     }
 }
 
+fun reorderSubcommands(args: Array<String>): Array<String> {
+    val instanceSubcommands = listOf(
+        "check", "create", "edit", "list", "launch", "backup",
+        "delete", "open", "attach", "config", "sp",
+        "modrinth", "world", "info"
+    )
+    val newArgs = when {
+        args.size >= 2 && args[1] in instanceSubcommands && checkInstance(args[0]) -> {
+            buildList {
+                add(args[1])
+                add(args[0])
+                addAll(args.drop(2))
+            }.toTypedArray()
+        }
+        else -> args
+    }
+
+    return newArgs
+
+}
 
 
 
@@ -327,5 +346,5 @@ fun main(args: Array<String>) {
     runBlocking { checkUpdates() }
     I18n.loadAllLocales()
     I18n.setLocale(readConfig().lang)
-    MS().main(args)
+    MS().main(reorderSubcommands(args))
 }

@@ -23,7 +23,7 @@ object Test{
                 continue
             }
             try {
-                ms.main(input.split(" "))
+                ms.main(reorderSubcommands(input.split(" ").toTypedArray()))
             } catch(e: Exception){
                 println(e.message)
             }
