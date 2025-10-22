@@ -15,7 +15,18 @@ if (versionFile.exists()) {
 
 var buildNumber = versionProps.getProperty("buildNumber", "0").toInt()
 
-var baseVersion = "1.5.2"
+var baseVersion = "1.5.3"
+
+if (project.hasProperty("rbn")) {
+    buildNumber = 0
+    println("Build number has been reset to 0.")
+    versionProps.setProperty("buildNumber", buildNumber.toString())
+    versionFile.outputStream().use {
+        versionProps.store(it, "This file stores the auto-incremented build number.")
+    }
+}
+
+
 
 version = "$baseVersion.$buildNumber"
 group = "com.magnariuk"
