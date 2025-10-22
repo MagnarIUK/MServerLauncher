@@ -288,7 +288,7 @@ class InfoCommand : Command("info", t("command.info._")) {
     override fun run() {
         val table = Table(t("command.info.tableTitle", BuildConfig.APP_NAME))
         var verStr = "${BuildConfig.APP_VERSION} ${t("command.info.buildNumber")} ${BuildConfig.BUILD_NUMBER}"
-        val latestVer = runBlocking { checkUpdates(justChecking = true) }
+        val latestVer = runBlocking { checkUpdates(justChecking = true, forceCheck = true) }
         if(latestVer != BuildConfig.APP_VERSION) verStr+=" | ${yellow}UPDATE TO $latestVer IS AVAILABLE$reset"
         table.printVertical(mapOf(
             t("command.info.ver") to verStr,

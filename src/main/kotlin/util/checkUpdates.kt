@@ -27,11 +27,11 @@ fun isItTimeToCheckForAnUpdate(lastChecked: Long, interval: Long): Boolean {
 
 
 suspend fun getLatestRelease(network: Network = Network()): GitHubRelease = network.get(GITHUB_UPDATES).body<GitHubRelease>()
-suspend fun checkUpdates(network: Network = Network(), justChecking: Boolean = false): String {
+suspend fun checkUpdates(network: Network = Network(), justChecking: Boolean = false, forceCheck: Boolean = false): String {
     val currentVersion = BuildConfig.APP_VERSION
     val cache = withContext(Dispatchers.IO) { AppCache.load() }
 
-    if(isItTimeToCheckForAnUpdate(cache.update.lastChecked, readConfig().checkUpdateInterval)){
+    if(isItTimeToCheckForAnUpdate(cache.update.lastChecked, readConfig().checkUpdateInterval) || forceCheck){
         try {
             val release = getLatestRelease(network)
             val latestTag = release.tagName.removePrefix("v")
