@@ -15,7 +15,7 @@ if (versionFile.exists()) {
 
 var buildNumber = versionProps.getProperty("buildNumber", "0").toInt()
 
-var baseVersion = "1.5.3"
+var baseVersion = "1.5.4"
 
 if (project.hasProperty("rbn")) {
     buildNumber = 0

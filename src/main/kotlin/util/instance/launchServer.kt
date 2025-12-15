@@ -21,7 +21,7 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
     val instancePath = Path.of(config.instancesFolder, instanceName).toFile()
 
     val serverJarPath = (Path.of(config.instancesFolder) / ".versions")
-    val javaExec = "java"
+    val javaExec = config.exec
     try {
         if (instance.autoBackup && !exitImmediately) {
             println(t("command.launch.autobackup"))

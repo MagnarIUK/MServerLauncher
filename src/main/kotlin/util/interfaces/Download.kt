@@ -5,6 +5,6 @@ data class Download(
     val name: String,
     val contentType: String,
     val contentLength: Long,
-    val progress: Float
+    val progress: Float,
 )
 

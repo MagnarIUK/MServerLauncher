@@ -58,5 +58,6 @@ private fun mergeWithDefaults(cfg: CONFIG): CONFIG {
         lang = cfg.lang,
         checkUpdateInterval = cfg.checkUpdateInterval,
         logMaxLines = cfg.logMaxLines,
+        exec = cfg.exec,
     )
 }
