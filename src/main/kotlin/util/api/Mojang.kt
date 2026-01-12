@@ -10,13 +10,18 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.Json
 
+private val json = Json {
+    prettyPrint = true
+    ignoreUnknownKeys = true
+}
+
 suspend fun getVersions(network: Network = Network()): Manifest {
     val url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
     val response: HttpResponse = network.get(url)
 
     if (response.status == HttpStatusCode.OK) {
         val bodyText = response.bodyAsText()
-        return Json.decodeFromString<Manifest>(bodyText)
+        return json.decodeFromString<Manifest>(bodyText)
     } else {
         throw Exception(t("util.api.failedToFetchVersionsMinecraft", response.status))
     }
@@ -37,7 +42,7 @@ suspend fun getVersion(versionId: String, network: Network = Network()): Package
     val response = network.get(versionEntry.url)
     if (response.status == HttpStatusCode.OK) {
         val bodyText = response.bodyAsText()
-        return Json.decodeFromString<Package>(bodyText)
+        return json.decodeFromString<Package>(bodyText)
     } else {
         throw Exception(t("util.api.failedToFetchVersion", ver, response.status))
     }

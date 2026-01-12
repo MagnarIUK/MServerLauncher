@@ -4,7 +4,7 @@ import com.magnariuk.util.configs.readConfig
 import java.awt.Desktop
 import java.io.File
 
-fun openInDefaultEditor(file: File, ifNotExists: String? = null ) {
+fun openInDefaultEditor(file: File, ifNotExists: String? = null, apiMode: Boolean = false ) {
     if (!file.exists()) {
         ifNotExists?.let { println(it); return }
         throw IllegalArgumentException(t("util.open.fileNotExists", file.absolutePath))
@@ -18,7 +18,7 @@ fun openInDefaultEditor(file: File, ifNotExists: String? = null ) {
                 .start()
             return
         } catch (e: Exception) {
-            println(t("util.open.failedToStart", cfg.defaultEditor, e.message))
+            if(!apiMode) println(t("util.open.failedToStart", cfg.defaultEditor, e.message))
         }
     }
 

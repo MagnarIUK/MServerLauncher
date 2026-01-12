@@ -10,25 +10,49 @@ import com.magnariuk.util.configs.*
 import com.magnariuk.util.instance.backupApi.backupInstance
 import com.magnariuk.util.instance.configsApi.setResourcePack
 import com.magnariuk.util.t
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import kotlin.concurrent.thread
 import kotlin.io.path.div
 
-suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmediately: Boolean = false) {
+suspend fun launchServer(
+    instanceName: String,
+    gui: Boolean = false,
+    exitImmediately: Boolean = false,
+    logger: ((String) -> Unit)? = null,
+    onProcessStart: ((Process) -> Unit)? = null,
+    apiMode: Boolean = false) {
+
+    fun log(msg: String) {
+        if (logger != null) logger(msg) else println(msg)
+    }
+    
     val config = readConfig()
     val instance = getInstance(instanceName)!!
 
     val instancePath = Path.of(config.instancesFolder, instanceName).toFile()
 
     val serverJarPath = (Path.of(config.instancesFolder) / ".versions")
-    val javaExec = config.exec
+    val version = getVersion(instance.version.minecraft)
+
+    val javaExec = when(version.javaVersion.majorVersion){
+        25 ->  config.jvm25
+        21 ->  config.jvm21
+        17 ->  config.jvm17
+        16 ->  config.jvm16
+        8 ->  config.jvm8
+        else -> {"java"}
+    }
+
+
     try {
         if (instance.autoBackup && !exitImmediately) {
-            println(t("command.launch.autobackup"))
+            log(t("command.launch.autobackup"))
             if (!backupInstance(instanceName, t("command.launch.backupDesc"))) {
-                println(t("command.launch.autoBackupFailed"))
+                log(t("command.launch.autoBackupFailed"))
             } else {
-                println(t("command.launch.autoBackupCompleted"))
+                log(t("command.launch.autoBackupCompleted"))
             }
         }
 
@@ -44,25 +68,25 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
 
             "fabric" -> {
                 serverJarUrl = getFabric(instance.version.minecraft, loader = instance.version.loader.version) ?: run {
-                    println(t("command.launch.failedToGetFabric"))
+                    log(t("command.launch.failedToGetFabric"))
                     return
                 }
-                println(serverJarUrl)
-                println(instance.version.loader.version)
+                log(serverJarUrl)
+                log(instance.version.loader.version)
                 serverSha = calculateRemoteSha1(serverJarUrl) ?: run {
-                    println(t("command.launch.failedCalculateFabricSha"))
+                    log(t("command.launch.failedCalculateFabricSha"))
                     return
                 }
             }
 
             else -> {
-                println(t("command.launch.unsupportedLoader", listOf(instance.version.loader.type)))
+                log(t("command.launch.unsupportedLoader", listOf(instance.version.loader.type)))
                 return
             }
         }
 
         if (serverJarUrl.isEmpty() || serverSha.isEmpty()) {
-            println(t("command.launch.serverDownloadInfoMissing"))
+            log(t("command.launch.serverDownloadInfoMissing"))
             return
         }
         var versionStr = "${ver.id}.jar"
@@ -72,19 +96,16 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
         val serverJarFile = (serverJarPath / versionStr).toFile()
         serverJarFile.parentFile.mkdirs()
         val currentSha = if (serverJarFile.exists()) {
-            println(t("command.launch.checkingServerJarSha"))
+            log(t("command.launch.checkingServerJarSha"))
             calculateFileSha1(serverJarFile.absolutePath)
         } else null
 
         if (!serverJarFile.exists() || currentSha != serverSha) {
-            println(t("command.launch.downloadingJar"))
+            log(t("command.launch.downloadingJar"))
             downloadServer(serverJarUrl, serverSha, serverJarFile)
         } else {
-            println(t("command.launch.jarUpToDate"))
+            log(t("command.launch.jarUpToDate"))
         }
-
-
-        if(!exitImmediately) setResourcePack(instanceName)
 
 
         val memoryAllocation = instance.memory.ifEmpty { INSTANCE_CONFIG().memory }
@@ -96,75 +117,98 @@ suspend fun launchServer(instanceName: String, gui: Boolean = false, exitImmedia
             "-jar",
             serverJarFile.absolutePath
         )
-
-        val resPack = instance.resourcepack
-        println(t("command.launch.launchingWithCommand", listOf(command.joinToString(" "))))
-
-
-
-        if(!exitImmediately) {
-            println(t("command.launch.useGui", listOf(gui)))
+        if (!gui || exitImmediately || logger != null) {
+            command.add("nogui")
         }
+        val resPack = instance.resourcepack
+        if(!exitImmediately) setResourcePack(instanceName, apiMode = apiMode)
+        if(!exitImmediately) {
+            log(t("command.launch.useGui", listOf(gui)))
+        }
+        log(t("command.launch.launchingWithCommand", listOf(command.joinToString(" "))))
 
 
         cleanUp(instanceName)
 
-        if (!gui || exitImmediately) {
-            command.add("nogui")
-            if(exitImmediately) {
-                val process = ProcessBuilder(command)
-                    .directory(instancePath)
-                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                    .redirectError(ProcessBuilder.Redirect.PIPE)
-                    .start()
+        val builder = ProcessBuilder(command)
+            .directory(instancePath)
 
-                process.inputStream.bufferedReader().useLines { lines ->
-                    for (line in lines) {
-                        val logLineRegex = Regex("""\[\d{2}:\d{2}:\d{2}]\s+\[([^\]]+?)/([A-Z]+)]:""")
-                        val match = logLineRegex.find(line)
-                        if (match != null) {
-                            println(line)
-                        }
-
-                        if ("Done (" in line && line.contains("For help, type")){
-                            process.outputStream.bufferedWriter().use { it.write("stop\n"); it.flush() }
-                            break
-                        }
-                    }
-                }
-
-                process.waitFor()
-                println(t("command.launch.initialisedAndExited"))
-            } else{
-                val process = ProcessBuilder(command)
-                    .directory(instancePath)
-                    .inheritIO()
-                    .start()
-                process.waitFor()
-                println(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
+        if (exitImmediately) {
+            builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
+            builder.redirectError(ProcessBuilder.Redirect.PIPE)
+            val process = withContext(Dispatchers.IO) {
+                builder.start()
             }
 
-        } else {
-            val process = ProcessBuilder(command)
-                .directory(instancePath)
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .redirectInput(ProcessBuilder.Redirect.PIPE)
-                .start()
+            process.inputStream.bufferedReader().useLines { lines ->
+                for (line in lines) {
+                    val logLineRegex = Regex("""\[\d{2}:\d{2}:\d{2}]\s+\[([^]]+?)/([A-Z]+)]:""")
+                    val match = logLineRegex.find(line)
+                    if (match != null) log(line)
 
+                    if ("Done (" in line && line.contains("For help, type")) {
+                        process.outputStream.bufferedWriter().use { it.write("stop\n"); it.flush() }
+                        break
+                    }
+                }
+            }
+            withContext(Dispatchers.IO) {
+                process.waitFor()
+            }
+            log(t("command.launch.initialisedAndExited"))
+        }
+        else if (logger != null) {
+            builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
+            builder.redirectError(ProcessBuilder.Redirect.PIPE)
+            builder.redirectInput(ProcessBuilder.Redirect.PIPE)
+
+            val process = withContext(Dispatchers.IO) {
+                builder.start()
+            }
+
+            onProcessStart?.invoke(process)
+
+            thread(start = true) {
+                process.inputStream.bufferedReader().useLines { lines ->
+                    lines.forEach { log(it) }
+                }
+            }
+            thread(start = true) {
+                process.errorStream.bufferedReader().useLines { lines ->
+                    lines.forEach { log("[ERR] $it") }
+                }
+            }
+
+            withContext(Dispatchers.IO) {
+                process.waitFor()
+            }
+            log(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
+        }
+        else if (!gui) {
+            builder.inheritIO()
+            val process = withContext(Dispatchers.IO) {
+                builder.start()
+            }
+            withContext(Dispatchers.IO) {
+                process.waitFor()
+            }
+            log(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
+        }
+        else {
+            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            builder.redirectError(ProcessBuilder.Redirect.DISCARD)
+            builder.redirectInput(ProcessBuilder.Redirect.PIPE)
+
+            val process = builder.start()
 
             thread(start = true, isDaemon = true) {
-                println(t("command.launch.serverStarted", listOf(process.pid())))
+                log(t("command.launch.serverStarted", listOf(process.pid())))
                 process.waitFor()
-                println(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
+                log(t("command.launch.serverExited", listOf(instanceName, process.exitValue())))
             }
         }
 
     } catch (e: Exception) {
-        when (e) {
-            is java.net.ConnectException, is java.net.UnknownHostException -> println(t("command.launch.networkError", listOf(e)))
-            is java.io.FileNotFoundException -> println(t("command.launch.javaNotFound", listOf(javaExec)))
-            else -> println(t("command.launch.unexpectedError", listOf(e)))
-        }
+        log(t("command.launch.unexpectedError", listOf(e)))
     }
 }

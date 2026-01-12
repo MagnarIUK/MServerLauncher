@@ -6,7 +6,7 @@ import com.magnariuk.util.configs.readConfig
 import com.magnariuk.util.t
 import java.nio.file.Path
 
-fun listInstances(): List<Pair<String, INSTANCE_CONFIG>> {
+fun listInstances(apiMode: Boolean = false ): List<Pair<String, INSTANCE_CONFIG>> {
     val config = readConfig()
     val instancesPath = Path.of(config.instancesFolder)
     instancesPath.toFile().mkdirs()
@@ -30,26 +30,28 @@ fun listInstances(): List<Pair<String, INSTANCE_CONFIG>> {
     }
 
     if (foundInstances.isNotEmpty()) {
-        val title = t("command.list.subs.table.title")
-        val columns = listOf(
-            t("command.list.subs.table.name") to 20,
-            t("command.list.subs.table.loader") to 15,
-            t("command.list.subs.table.version") to 20,
-            t("command.list.subs.table.memory") to 10)
-        val table = Table(title, columns)
+        if (!apiMode) {
+            val title = t("command.list.subs.table.title")
+            val columns = listOf(
+                t("command.list.subs.table.name") to 20,
+                t("command.list.subs.table.loader") to 15,
+                t("command.list.subs.table.version") to 20,
+                t("command.list.subs.table.memory") to 10)
+            val table = Table(title, columns)
 
-        table.printHeader()
-        for ((name, instance) in foundInstances) {
-            table.printRow(
-                listOf(
-                    name,
-                    instance.version.loader.type,
-                    getVersionNameDownload(instance.version.minecraft),
-                    instance.memory
+            table.printHeader()
+            for ((name, instance) in foundInstances) {
+                table.printRow(
+                    listOf(
+                        name,
+                        instance.version.loader.type,
+                        getVersionNameDownload(instance.version.minecraft),
+                        instance.memory
+                    )
                 )
-            )
+            }
+            table.printClosing()
         }
-        table.printClosing()
     } else {
         println("No Minecraft server instances found.")
     }

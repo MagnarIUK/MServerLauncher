@@ -8,7 +8,8 @@ import java.nio.file.Path
 fun attachResourcePack(
     instanceName: String,
     resourcePackValue: String,
-    resourcePackPort: Int? = 2548
+    resourcePackPort: Int? = 2548,
+    apiMode: Boolean = false
 ): Boolean {
     val instanceCfg = getInstance(instanceName)!!
 
@@ -19,7 +20,7 @@ fun attachResourcePack(
     if (!isUrl) {
         val rpPath = Path.of(rpValue).toFile()
         if (!rpPath.isFile) {
-            println(t("command.attach.subs.rpNotFound", resourcePackValue))
+            if(!apiMode) println(t("command.attach.subs.rpNotFound", resourcePackValue))
             return false
         }
         rpValue = rpPath.absolutePath
@@ -28,9 +29,9 @@ fun attachResourcePack(
         name = instanceName,
         resourcepack = rpValue,
         resourcepackPort = resourcePackPort,
-        isInternal = true
+        apiMode = true
     )
 
-    println(t("command.attach.subs.attached", instanceName))
+    if(!apiMode) println(t("command.attach.subs.attached", instanceName))
     return true
 }

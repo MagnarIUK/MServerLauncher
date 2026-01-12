@@ -227,5 +227,9 @@
       "ab": "Auto-Backup",
       "rp": "Resourcepack"
     }
+  },
+
+  "tui": {
+    "selectInstance": "Select an Instance"
   }
 }

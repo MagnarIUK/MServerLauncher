@@ -15,7 +15,7 @@ if (versionFile.exists()) {
 
 var buildNumber = versionProps.getProperty("buildNumber", "0").toInt()
 
-var baseVersion = "1.5.4"
+var baseVersion = "1.6.0"
 
 if (project.hasProperty("rbn")) {
     buildNumber = 0
@@ -65,6 +65,9 @@ dependencies {
     val slf4jVersion = "2.0.17"
     implementation("org.slf4j:slf4j-simple:$slf4jVersion")
 
+    val lanternaVersion = "3.1.3"
+    // Source: https://mvnrepository.com/artifact/com.googlecode.lanterna/lanterna
+    implementation("com.googlecode.lanterna:lanterna:$lanternaVersion")
 
     val okioVersion = "3.16.1"
     implementation("com.squareup.okio:okio:${okioVersion}")

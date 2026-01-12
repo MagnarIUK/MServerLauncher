@@ -25,7 +25,11 @@ data class CONFIG(
     @SerialName("lang") var lang: String = "en",
     @SerialName("checkUpdateInterval") var checkUpdateInterval: Long = 3_600_000,
     @SerialName("logMaxLines") var logMaxLines: Int = 4,
-    @SerialName("exec") var exec: String = "java",
+    @SerialName("jvm8") var jvm8: String = "java",
+    @SerialName("jvm16") var jvm16: String = "java",
+    @SerialName("jvm17") var jvm17: String = "java",
+    @SerialName("jvm21") var jvm21: String = "java",
+    @SerialName("jvm25") var jvm25: String = "java",
 ) : Configurable<CONFIG> {
     override val file: File
         get() = configFilePath.toFile()

@@ -24,7 +24,9 @@ fun createInstance(
     resourcePack: String = "",
     resourcePackPort: Int = 2548,
     loader: String = "vanilla",
-    loaderVersion: String = "latest"
+    loaderVersion: String = "latest",
+    runServer: Boolean = false,
+    apiMode: Boolean = false
 ): Boolean {
     val config = readConfig()
     val instancePath = Path.of(config.instancesFolder, name)
@@ -32,12 +34,12 @@ fun createInstance(
 
     val validLoaders = setOf("vanilla", "fabric")
     if (loader !in validLoaders) {
-        println(t("instance.notValidLoader", listOf(loader)))
+        if(!apiMode) println(t("instance.notValidLoader", listOf(loader)))
         return false
     }
 
     if (!checkMinecraftVersion(version)) {
-        println(t("instance.notValidVersion", listOf(version)))
+        if(!apiMode) println(t("instance.notValidVersion", listOf(version)))
         return false
     }
 
@@ -46,7 +48,7 @@ fun createInstance(
         memory = memory,
         autoBackup = autoBackup,
         resourcepack = resourcePack,
-        resourcepackPort = resourcePackPort,
+        resourcepackPort = 2054,
         version = Version(
             minecraft = version,
             loader = Loader(type = loader, version = loaderVersion)
@@ -79,17 +81,25 @@ fun createInstance(
         eulaFile.writeText(lines.joinToString("\n") + "\n")
     }
 
-    println(t("instance.created", listOf(name, loader, version, memory, if (autoBackup) "Enabled" else "Disabled")))
+    if(!apiMode)println(t("instance.created", listOf(name, loader, version, memory, if (autoBackup) "Enabled" else "Disabled")))
     if (resourcePack.isNotEmpty()) {
-        println(t("instance.createdRp", listOf(Path.of(resourcePack).fileName)))
+        if(!apiMode) println(t("instance.createdRp", listOf(Path.of(resourcePack).fileName)))
     }
-    runBlocking {
-        val delete = prompt(t("prompts.deleteWorldAfterInitializingProperties"))
-        launchServer(name, exitImmediately = true)
-        if (delete== "y") {
-            resetWorld(name)
+    if(!apiMode){
+        runBlocking {
+            val delete = prompt(t("prompts.deleteWorldAfterInitializingProperties"))
+            launchServer(name, exitImmediately = true)
+            if (delete== "y") {
+                resetWorld(name)
+            }
         }
     }
+    if(runServer){
+        runBlocking {
+            launchServer(name, exitImmediately = true)
+        }
+    }
+
     return true
 }
 

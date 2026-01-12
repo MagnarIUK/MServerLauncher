@@ -21,7 +21,7 @@ fun editInstance(
     backups: Map<String, Backup>? = null,
     loaderType: String? = null,
     loaderVersion: String? = null,
-    isInternal: Boolean = false,
+    apiMode: Boolean = false,
 ) {
     val config = readConfig()
     val instancePath = Path.of(config.instancesFolder, name)
@@ -48,7 +48,7 @@ fun editInstance(
     )
 
     resourcepack?.let {
-        if (!isInternal) println(t("command.edit.subs.useAttach"))
+        if (!apiMode) println(t("command.edit.subs.useAttach"))
         else{
             instanceCfg.resourcepack = resourcepack
         }
@@ -57,5 +57,5 @@ fun editInstance(
     Files.createDirectories(instancePath)
     cfgFile.writeText(json.encodeToString(instanceCfg))
 
-    println(t("command.edit.subs.updated", listOf(name)))
+    if(!apiMode) println(t("command.edit.subs.updated", listOf(name)))
 }

@@ -20,7 +20,8 @@ data class INSTANCE_CONFIG(
 data class Version(
     @SerialName("minecraft") val minecraft: String = "latest",
     @SerialName("loader") val loader: Loader = Loader(),
-)
+) {
+}
 
 @Serializable
 data class Loader(

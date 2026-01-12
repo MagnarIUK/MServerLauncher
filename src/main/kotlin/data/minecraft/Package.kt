@@ -1,5 +1,6 @@
 package com.magnariuk.data.minecraft
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -48,10 +49,13 @@ data class Package(
     val type: String,
 ) {
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Serializable
+    @kotlinx.serialization.json.JsonIgnoreUnknownKeys
     data class Arguments(
         val game: JsonElement,
         val jvm: JsonElement,
+        @SerialName("default-user-jvm") val defaultUserJvm: JsonElement? = null,
     )
     @Serializable
     data class AssetIndex(
@@ -65,10 +69,10 @@ data class Package(
     data class Downloads(
         val client: Download,
         @SerialName("client_mappings")
-        val clientMappings: Download,
+        val clientMappings: Download? = null,
         val server: Download,
         @SerialName("server_mappings")
-        val serverMappings: Download,
+        val serverMappings: Download? = null,
         @SerialName("windows_server")
         val windowsServer: Download? =null
     ) {

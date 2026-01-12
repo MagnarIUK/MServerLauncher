@@ -347,5 +347,9 @@ fun main(args: Array<String>) {
     runBlocking { checkUpdates() }
     I18n.loadAllLocales()
     I18n.setLocale(readConfig().lang)
-    MS().main(reorderSubcommands(args))
+    if (args.isEmpty()){
+        launchLanterna()
+    } else{
+        MS().main(reorderSubcommands(args))
+    }
 }

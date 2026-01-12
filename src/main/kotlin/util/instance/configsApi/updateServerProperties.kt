@@ -9,7 +9,7 @@ fun updateServerProperties(instanceName: String, key: String, value: String, int
     val serverPropertiesPath = Path.of(instancesFolder, instanceName, "server.properties").toFile()
 
     if (!serverPropertiesPath.exists()) {
-        println(t("command.sp.fileNotExists", instanceName))
+        if(!internal) println(t("command.sp.fileNotExists", instanceName))
         return false
     }
 
@@ -25,7 +25,7 @@ fun updateServerProperties(instanceName: String, key: String, value: String, int
     }
 
     if (key !in properties) {
-        println(t("command.sp.keyNotFound", key))
+        if(!internal) println(t("command.sp.keyNotFound", key))
         return false
     }
 
@@ -44,6 +44,6 @@ fun updateServerProperties(instanceName: String, key: String, value: String, int
     }
 
     serverPropertiesPath.writeText(newLines.joinToString("\n") + "\n")
-    println(t("command.sp.updated", key, value))
+    if(!internal) println(t("command.sp.updated", key, value))
     return true
 }

@@ -5,12 +5,12 @@ import com.magnariuk.util.api.calculateRemoteSha1
 import com.magnariuk.util.instance.getInstance
 import com.magnariuk.util.t
 
-suspend fun setResourcePack(instanceName: String, network: Network = Network()): Boolean {
+suspend fun setResourcePack(instanceName: String, network: Network = Network(), apiMode: Boolean = false): Boolean {
     val instanceCfg = getInstance(instanceName) ?: return false
     val rpValue = instanceCfg.resourcepack
 
     if (rpValue.isEmpty()) {
-        println(t("command.attach.subs.disablingResourcePack"))
+        if(!apiMode)println(t("command.attach.subs.disablingResourcePack"))
         updateServerProperties(instanceName, "require-resource-pack", "false", internal = true)
         updateServerProperties(instanceName, "resource-pack", "", internal = true)
         updateServerProperties(instanceName, "resource-pack-sha1", "", internal = true)
@@ -23,14 +23,14 @@ suspend fun setResourcePack(instanceName: String, network: Network = Network()):
     if (isUrl) {
         val rpSha1 = calculateRemoteSha1(rpValue, network = network)
         if (rpSha1 == null) {
-            println(t("command.attach.subs.failedToCalculateSHA"))
+            if(!apiMode)println(t("command.attach.subs.failedToCalculateSHA"))
             return false
         }
 
         updateServerProperties(instanceName, "resource-pack", rpValue, internal = true)
         updateServerProperties(instanceName, "resource-pack-sha1", rpSha1, internal = true)
 
-        println(t("command.attach.subs.propertiesUpdated", instanceName))
+        if(!apiMode)println(t("command.attach.subs.propertiesUpdated", instanceName))
         return true
 
     } else {
