@@ -1038,9 +1038,10 @@ fun unzipWithProgressTUI(gui: WindowBasedTextGUI, zipFile: File, destFolder: Fil
 
     thread {
         try {
+            val zipSize = ZipFile(zipFile).use { it.size() }
 
-            val allFiles = zipFile.walkBottomUp().filter { it.isFile }.toList()
-            gui.guiThread.invokeLater { pBar.max = allFiles.size }
+            gui.guiThread.invokeLater { pBar.max = zipSize }
+
             ZipFile(zipFile).use { zip ->
                 val entries = zip.entries().toList()
 
@@ -1065,5 +1066,6 @@ fun unzipWithProgressTUI(gui: WindowBasedTextGUI, zipFile: File, destFolder: Fil
             gui.guiThread.invokeLater { window.close(); showMessageDialog(gui, "Error", "Rollback failed: ${e.message}") }
         }
     }
-    gui.waitForWindowToClose(window)
+
+    gui.addWindowAndWait(window)
 }
